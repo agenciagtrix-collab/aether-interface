@@ -1,17 +1,50 @@
-import { useEffect, useRef } from "react";
-import { Bot, User, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Bot, User, Sparkles, Paperclip, Brain, ChevronDown } from "lucide-react";
 import { usePanel } from "./PanelContext";
 import { cn } from "@/lib/utils";
 
+function TypingDots() {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]" />
+      <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]" />
+      <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" />
+    </span>
+  );
+}
+
+function ThinkingBlock({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  if (!text.trim()) return null;
+  return (
+    <div className="mb-2 rounded-lg border border-border bg-background/40">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+      >
+        <Brain className="h-3 w-3 text-primary" />
+        <span className="uppercase tracking-wider">Raciocínio</span>
+        <ChevronDown className={cn("ml-auto h-3 w-3 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <pre className="max-h-56 overflow-y-auto whitespace-pre-wrap border-t border-border px-2.5 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+          {text}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 export function MessageList() {
-  const { messages, mode, isRunning } = usePanel();
+  const { messages, mode, isRunning, statusText } = usePanel();
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isRunning]);
+  }, [messages, isRunning, statusText]);
 
-  if (messages.length === 0) {
+  if (messages.length === 0 && !isRunning) {
     return (
       <div className="flex h-full items-center justify-center px-6">
         <div className="max-w-md text-center animate-fade-in">
@@ -23,13 +56,17 @@ export function MessageList() {
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
             {mode === "agent"
-              ? "Defina uma missão complexa abaixo. O agente decompõe em etapas e mostra o raciocínio em tempo real no terminal à direita."
+              ? "Defina uma missão. O agente decompõe em etapas e mostra o raciocínio no terminal à direita."
               : "Faça uma pergunta direta. Use o modo Agente para tarefas multi-etapas com pesquisa web."}
           </p>
         </div>
       </div>
     );
   }
+
+  const lastMsg = messages[messages.length - 1];
+  const showTypingPlaceholder =
+    isRunning && (!lastMsg || lastMsg.role === "user");
 
   return (
     <div className="h-full overflow-y-auto px-6 py-6">
@@ -60,8 +97,42 @@ export function MessageList() {
                   : "bg-surface-2 text-foreground border border-border",
               )}
             >
-              <p className="whitespace-pre-wrap">{m.content}</p>
-              {m.mode === "agent" && m.role === "assistant" && (
+              {m.role === "assistant" && m.thinking && <ThinkingBlock text={m.thinking} />}
+
+              {m.content ? (
+                <p className="whitespace-pre-wrap">
+                  {m.content}
+                  {m.streaming && (
+                    <span className="ml-0.5 inline-block h-3 w-1.5 translate-y-0.5 bg-primary caret-blink" />
+                  )}
+                </p>
+              ) : m.streaming ? (
+                <span className="inline-flex items-center gap-2 text-muted-foreground">
+                  <Brain className="h-3.5 w-3.5 text-primary animate-pulse" />
+                  pensando <TypingDots />
+                </span>
+              ) : null}
+
+              {m.attachments && m.attachments.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {m.attachments.map((f, i) => (
+                    <span
+                      key={i}
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px]",
+                        m.role === "user"
+                          ? "border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground"
+                          : "border-border bg-background/40 text-muted-foreground",
+                      )}
+                    >
+                      <Paperclip className="h-3 w-3" />
+                      {f}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {m.mode === "agent" && m.role === "assistant" && m.content && (
                 <span className="mt-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-primary">
                   <Sparkles className="h-3 w-3" /> resposta do agente
                 </span>
@@ -70,12 +141,21 @@ export function MessageList() {
           </div>
         ))}
 
-        {isRunning && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground animate-fade-in">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-            {mode === "agent" ? "Agente executando missão..." : "Gerando resposta..."}
+        {showTypingPlaceholder && (
+          <div className="flex gap-3 animate-fade-in">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-2">
+              <Bot className="h-4 w-4" />
+            </div>
+            <div className="rounded-2xl border border-border bg-surface-2 px-4 py-3">
+              <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <Brain className="h-3.5 w-3.5 text-primary animate-pulse" />
+                {statusText || (mode === "agent" ? "Agente raciocinando" : "Pensando")}
+                <TypingDots />
+              </span>
+            </div>
           </div>
         )}
+
         <div ref={endRef} />
       </div>
     </div>
