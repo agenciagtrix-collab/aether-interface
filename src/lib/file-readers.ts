@@ -61,7 +61,10 @@ function archiveScore(path: string): number {
   return score;
 }
 
-async function readZip(file: File): Promise<AttachedFile> {
+export type ProgressFn = (info: { phase: string; loaded: number; total: number }) => void;
+
+async function readZip(file: File, onProgress?: ProgressFn): Promise<AttachedFile> {
+  onProgress?.({ phase: "Descompactando ZIP", loaded: 0, total: 1 });
   const zip = await JSZip.loadAsync(file);
   const entries = Object.values(zip.files)
     .filter((entry) => !entry.dir)
@@ -72,8 +75,11 @@ async function readZip(file: File): Promise<AttachedFile> {
 
   const sections: string[] = [];
   let usedChars = 0;
+  const total = entries.length || 1;
 
-  for (const { entry } of entries) {
+  for (let i = 0; i < entries.length; i++) {
+    const { entry } = entries[i];
+    onProgress?.({ phase: `Lendo ${entry.name.split("/").pop()}`, loaded: i, total });
     if (usedChars >= MAX_ARCHIVE_CHARS) break;
     const raw = await entry.async("string");
     const remaining = Math.max(0, MAX_ARCHIVE_CHARS - usedChars);
@@ -81,6 +87,7 @@ async function readZip(file: File): Promise<AttachedFile> {
     sections.push(`--- ${entry.name} ---\n${content}`);
     usedChars += content.length;
   }
+  onProgress?.({ phase: "Finalizando", loaded: total, total });
 
   const totalFiles = Object.values(zip.files).filter((entry) => !entry.dir).length;
   const summary = `ZIP lido: ${entries.length}/${totalFiles} arquivos textuais relevantes incluídos (${formatBytes(file.size)}).`;
