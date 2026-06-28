@@ -590,6 +590,8 @@ export function SettingsView() {
             />
           </section>
 
+          <AutoApplySection />
+
           <div className="flex items-center justify-between gap-3">
             <button
               onClick={handleReset}
