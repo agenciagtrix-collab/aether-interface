@@ -194,11 +194,10 @@ export function ChatView() {
 
 
   const resendWithUncensored = useCallback(
-    async (assistantId: string) => {
+    async (assistantId: string, modelOverride?: string) => {
       if (panel.isRunning) return;
       const idx = panel.messages.findIndex((m) => m.id === assistantId);
       if (idx < 0) return;
-      // localiza a última mensagem do usuário antes deste assistant
       let userMsg: typeof panel.messages[number] | undefined;
       for (let i = idx - 1; i >= 0; i--) {
         if (panel.messages[i].role === "user") {
@@ -208,21 +207,25 @@ export function ChatView() {
       }
       if (!userMsg) return;
       const uncensoredModel =
+        modelOverride ||
         (typeof window !== "undefined" && localStorage.getItem("jarvis_uncensored_model")) ||
         "cognitivecomputations/dolphin-mistral-24b-venice-edition:free";
+      setActiveAgent("uncensored");
       panel.setRunning(true);
       try {
         await runChat(userMsg.content, userMsg.attachments ?? [], {
           modelOverride: uncensoredModel,
           extraSystem: "\n\n[Reenvio em motor alternativo escolhido pelo usuário]",
+          agentId: "uncensored",
         });
       } finally {
         panel.setRunning(false);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [panel.messages, panel.isRunning, codeCtx],
+    [panel.messages, panel.isRunning, codeCtx, activeAgent],
   );
+
 
   const runAgent = async (text: string, attachments: AttachedFile[]) => {
     panel.clearTerminal();
