@@ -101,38 +101,46 @@ function IdeShellInner() {
   const showTerminal = mode === "agent";
 
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground">
-      <div className="flex flex-1 overflow-hidden">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <ActivityBar active={view} onSelect={setView} />
 
-        <PanelGroup orientation="horizontal" className="flex-1">
+        <PanelGroup orientation="horizontal" className="flex h-full min-w-0 flex-1">
           {/* Sidebar */}
-          <Panel defaultSize={18} minSize={12} maxSize={35} className="bg-surface-1">
-            <SidebarPanel view={view} />
+          <Panel defaultSize={18} minSize={10} maxSize={40} className="bg-surface-1">
+            <div className="flex h-full w-full min-w-0 overflow-hidden">
+              <SidebarPanel view={view} />
+            </div>
           </Panel>
-          <PanelResizeHandle className="w-px bg-border hover:bg-primary/50 transition-colors" />
+          <PanelResizeHandle className="w-px bg-border transition-colors hover:bg-primary/50" />
 
           {/* Editor + bottom terminal */}
-          <Panel defaultSize={52} minSize={25}>
-            <PanelGroup orientation="vertical">
+          <Panel defaultSize={52} minSize={20}>
+            <PanelGroup orientation="vertical" className="h-full w-full">
               <Panel defaultSize={showTerminal ? 70 : 100} minSize={20}>
-                <EditorArea />
+                <div className="h-full w-full min-w-0 overflow-hidden">
+                  <EditorArea />
+                </div>
               </Panel>
               {showTerminal && (
                 <>
-                  <PanelResizeHandle className="h-px bg-border hover:bg-primary/50 transition-colors" />
+                  <PanelResizeHandle className="h-px bg-border transition-colors hover:bg-primary/50" />
                   <Panel defaultSize={30} minSize={10} className="bg-surface-1">
-                    <ThinkingTerminal />
+                    <div className="h-full w-full min-w-0 overflow-hidden">
+                      <ThinkingTerminal />
+                    </div>
                   </Panel>
                 </>
               )}
             </PanelGroup>
           </Panel>
-          <PanelResizeHandle className="w-px bg-border hover:bg-primary/50 transition-colors" />
+          <PanelResizeHandle className="w-px bg-border transition-colors hover:bg-primary/50" />
 
           {/* Chat panel */}
-          <Panel defaultSize={30} minSize={20} maxSize={50} className="bg-surface-1">
-            <ChatView />
+          <Panel defaultSize={30} minSize={18} maxSize={50} className="bg-surface-1">
+            <div className="flex h-full w-full min-w-0 overflow-hidden">
+              <ChatView />
+            </div>
           </Panel>
         </PanelGroup>
       </div>
