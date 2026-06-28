@@ -22,11 +22,6 @@ async function walkTree(
   return out;
 }
 
-export interface CodeContext {
-  /** Bloco textual a injetar no system prompt; vazio se nada selecionado. */
-  promptBlock: string;
-  /** Componente JSX para renderizar (Use {bar} dentro do ChatView). */
-}
 
 export function CodeContextBar({
   onContextChange,
