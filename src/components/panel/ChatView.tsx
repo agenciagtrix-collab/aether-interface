@@ -1,11 +1,15 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ModeSwitcher } from "./ModeSwitcher";
 import { MessageList } from "./MessageList";
 import { InputBox } from "./InputBox";
+import { AgentBadge } from "./AgentBadge";
+import { UncensoredModal } from "./UncensoredModal";
 import { usePanel, type TerminalStep } from "./PanelContext";
 import type { AttachedFile } from "./PanelContext";
 import { buildAttachmentContext } from "@/lib/file-readers";
 import { CodeContextBar } from "@/components/ide/CodeContextBar";
+import { AGENTS, type AgentId } from "@/lib/agents";
+import { routeToAgent, isRefusal } from "@/lib/orchestrator";
 import {
   callChatCompletion,
   streamChatCompletion,
@@ -15,6 +19,8 @@ import {
 } from "@/lib/ai-clients";
 
 const uid = () => crypto.randomUUID();
+const ACTIVE_AGENT_KEY = "jarvis_active_agent";
+
 
 // extrai blocos <think>...</think> separando raciocínio da resposta final
 function splitThinking(raw: string): { thinking: string; answer: string } {
@@ -49,6 +55,19 @@ export function ChatView() {
   const panel = usePanel();
   const [codeCtx, setCodeCtx] = useState("");
   const handleCodeCtx = useCallback((s: string) => setCodeCtx(s), []);
+
+  const [activeAgent, setActiveAgent] = useState<AgentId>(() => {
+    if (typeof window === "undefined") return "orquestrador";
+    const saved = localStorage.getItem(ACTIVE_AGENT_KEY) as AgentId | null;
+    return saved && saved in AGENTS ? saved : "orquestrador";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") localStorage.setItem(ACTIVE_AGENT_KEY, activeAgent);
+  }, [activeAgent]);
+
+  const [refusalOpen, setRefusalOpen] = useState(false);
+  const lastAssistantIdRef = useRef<string | null>(null);
+
 
   const buildHistory = (extra: ChatMessage[] = []): ChatMessage[] => {
     const history: ChatMessage[] = panel.messages
@@ -86,10 +105,15 @@ export function ChatView() {
   const runChat = async (
     text: string,
     attachments: AttachedFile[],
-    opts: { modelOverride?: string; extraSystem?: string } = {},
+    opts: { modelOverride?: string; extraSystem?: string; agentId?: AgentId } = {},
   ) => {
-    panel.setStatusText(opts.modelOverride ? "Reenviando para modelo uncensored" : "Pensando");
+    const agentId = opts.agentId ?? activeAgent;
+    const agent = AGENTS[agentId];
+    panel.setStatusText(
+      opts.modelOverride ? `Reenviando via ${agent.name}` : `${agent.emoji} ${agent.name} pensando`,
+    );
     const asstId = panel.addMessage({ role: "assistant", mode: "chat", content: "", streaming: true });
+    lastAssistantIdRef.current = asstId;
 
     const userTurn: ChatMessage = {
       role: "user",
@@ -131,10 +155,15 @@ export function ChatView() {
       panel.updateMessage(asstId, { content: answerText.trim(), thinking: thinkText.trim() });
     };
 
+    const agentSystem = `\n\n[Persona ativa: ${agent.name}]\n${agent.systemPrompt}`;
+
     try {
       await streamChatCompletion(
         [
-          { role: "system", content: getReasoningSystem() + codeCtx + (opts.extraSystem ?? "") },
+          {
+            role: "system",
+            content: getReasoningSystem() + codeCtx + agentSystem + (opts.extraSystem ?? ""),
+          },
           ...buildHistory(),
           userTurn,
         ],
@@ -148,6 +177,11 @@ export function ChatView() {
         thinking: finalParsed.thinking,
         streaming: false,
       });
+
+      // Se não for já uncensored e a resposta parecer uma recusa → abre modal.
+      if (!opts.modelOverride && agentId !== "uncensored" && isRefusal(finalParsed.answer)) {
+        setRefusalOpen(true);
+      }
     } catch (err: any) {
       panel.updateMessage(asstId, {
         content: `❌ Erro: ${err?.message ?? String(err)}`,
@@ -158,12 +192,12 @@ export function ChatView() {
     }
   };
 
+
   const resendWithUncensored = useCallback(
-    async (assistantId: string) => {
+    async (assistantId: string, modelOverride?: string) => {
       if (panel.isRunning) return;
       const idx = panel.messages.findIndex((m) => m.id === assistantId);
       if (idx < 0) return;
-      // localiza a última mensagem do usuário antes deste assistant
       let userMsg: typeof panel.messages[number] | undefined;
       for (let i = idx - 1; i >= 0; i--) {
         if (panel.messages[i].role === "user") {
@@ -173,21 +207,25 @@ export function ChatView() {
       }
       if (!userMsg) return;
       const uncensoredModel =
+        modelOverride ||
         (typeof window !== "undefined" && localStorage.getItem("jarvis_uncensored_model")) ||
         "cognitivecomputations/dolphin-mistral-24b-venice-edition:free";
+      setActiveAgent("uncensored");
       panel.setRunning(true);
       try {
         await runChat(userMsg.content, userMsg.attachments ?? [], {
           modelOverride: uncensoredModel,
           extraSystem: "\n\n[Reenvio em motor alternativo escolhido pelo usuário]",
+          agentId: "uncensored",
         });
       } finally {
         panel.setRunning(false);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [panel.messages, panel.isRunning, codeCtx],
+    [panel.messages, panel.isRunning, codeCtx, activeAgent],
   );
+
 
   const runAgent = async (text: string, attachments: AttachedFile[]) => {
     panel.clearTerminal();
@@ -332,8 +370,18 @@ export function ChatView() {
     panel.clearAttachedFiles();
     panel.setRunning(true);
     try {
-      if (panel.mode === "agent") await runAgent(text, attachments);
-      else await runChat(text, attachments);
+      if (panel.mode === "agent") {
+        await runAgent(text, attachments);
+      } else {
+        // Roteamento LLM: só roteia se o usuário NÃO travou em uncensored.
+        let agentId: AgentId = activeAgent;
+        if (activeAgent !== "uncensored") {
+          panel.setStatusText("🧭 Roteando para o especialista ideal");
+          agentId = await routeToAgent(text);
+          setActiveAgent(agentId);
+        }
+        await runChat(text, attachments, { agentId });
+      }
     } finally {
       panel.setRunning(false);
     }
@@ -348,7 +396,10 @@ export function ChatView() {
             {panel.mode === "agent" ? "Modo Agente · multi-etapas" : "Modo Conversação"}
           </p>
         </div>
-        <ModeSwitcher />
+        <div className="flex items-center gap-2">
+          <AgentBadge active={activeAgent} onChange={setActiveAgent} />
+          <ModeSwitcher />
+        </div>
       </header>
 
       <div className="min-h-0 flex-1 overflow-hidden">
@@ -357,6 +408,16 @@ export function ChatView() {
 
       <CodeContextBar onContextChange={handleCodeCtx} />
       <InputBox onSubmit={handleSubmit} />
+
+      <UncensoredModal
+        open={refusalOpen}
+        onClose={() => setRefusalOpen(false)}
+        onConfirm={(modelId) => {
+          const id = lastAssistantIdRef.current;
+          if (id) void resendWithUncensored(id, modelId);
+        }}
+      />
     </div>
   );
 }
+
