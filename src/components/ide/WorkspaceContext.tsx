@@ -69,6 +69,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [adapter, setAdapter] = useState<FsAdapter | null>(null);
   const [tabs, setTabs] = useState<OpenTab[]>([]);
   const [activeTabPath, setActivePath] = useState<string | null>(null);
+  const [edits, setEdits] = useState<FileEdit[]>([]);
 
   const openNativeFolder = useCallback(async () => {
     if (!supportsNativeFs()) {
@@ -168,12 +169,90 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     for (const t of tabs) if (t.dirty) await saveTab(t.path);
   }, [tabs, saveTab]);
 
+  const applyEdit = useCallback(
+    async (path: string, content: string): Promise<FileEdit | null> => {
+      if (!adapter) {
+        toast.error("Abra uma pasta de trabalho primeiro.");
+        return null;
+      }
+      if (!adapter.canWrite()) {
+        toast.error("Escrita não suportada — use Chrome/Edge com pasta aberta nativamente.");
+        return null;
+      }
+      let previousContent: string | null = null;
+      try {
+        previousContent = await adapter.readText(path);
+      } catch {
+        previousContent = null; // arquivo novo
+      }
+      try {
+        await adapter.writeText(path, content);
+      } catch (err) {
+        toast.error(`Falha ao escrever ${path}: ${(err as Error).message}`);
+        return null;
+      }
+      const edit: FileEdit = {
+        id: crypto.randomUUID(),
+        path,
+        previousContent,
+        newContent: content,
+        timestamp: Date.now(),
+      };
+      setEdits((prev) => [...prev, edit]);
+      // sincroniza tab aberta (se houver) e abre se não
+      setTabs((prev) => {
+        const existing = prev.find((t) => t.path === path);
+        if (existing) {
+          return prev.map((t) =>
+            t.path === path ? { ...t, content, originalContent: content, dirty: false } : t,
+          );
+        }
+        const name = path.split("/").pop() ?? path;
+        return [
+          ...prev,
+          { path, name, content, originalContent: content, language: detectLanguage(name), dirty: false },
+        ];
+      });
+      setActivePath(path);
+      toast.success(previousContent === null ? `Criado: ${path}` : `Atualizado: ${path}`);
+      return edit;
+    },
+    [adapter],
+  );
+
+  const revertEdit = useCallback(
+    async (id: string) => {
+      const edit = edits.find((e) => e.id === id);
+      if (!edit || edit.reverted || !adapter) return;
+      try {
+        if (edit.previousContent === null) {
+          toast.warning(`Arquivo novo ${edit.path} — exclua manualmente via Explorer.`);
+        } else {
+          await adapter.writeText(edit.path, edit.previousContent);
+          setTabs((prev) =>
+            prev.map((t) =>
+              t.path === edit.path
+                ? { ...t, content: edit.previousContent!, originalContent: edit.previousContent!, dirty: false }
+                : t,
+            ),
+          );
+          toast.success(`Revertido: ${edit.path}`);
+        }
+        setEdits((prev) => prev.map((e) => (e.id === id ? { ...e, reverted: true } : e)));
+      } catch (err) {
+        toast.error(`Falha ao reverter: ${(err as Error).message}`);
+      }
+    },
+    [adapter, edits],
+  );
+
   const value = useMemo<WorkspaceState>(
     () => ({
       adapter,
       rootName: adapter?.rootName ?? null,
       tabs,
       activeTabPath,
+      edits,
       openNativeFolder,
       openFromFileList,
       closeWorkspace,
@@ -183,9 +262,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       updateTabContent,
       saveTab,
       saveAll,
+      applyEdit,
+      revertEdit,
       supportsWrite: adapter?.canWrite() ?? false,
     }),
-    [adapter, tabs, activeTabPath, openNativeFolder, openFromFileList, closeWorkspace, openFile, closeTab, updateTabContent, saveTab, saveAll],
+    [adapter, tabs, activeTabPath, edits, openNativeFolder, openFromFileList, closeWorkspace, openFile, closeTab, updateTabContent, saveTab, saveAll, applyEdit, revertEdit],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
