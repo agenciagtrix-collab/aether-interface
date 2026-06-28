@@ -79,7 +79,7 @@ function MarkdownMessage({ content, streaming }: { content: string; streaming?: 
   );
 }
 
-export function MessageList() {
+export function MessageList({ onResendUncensored }: MessageListProps = {}) {
   const { messages, mode, isRunning, statusText } = usePanel();
   const endRef = useRef<HTMLDivElement>(null);
 
