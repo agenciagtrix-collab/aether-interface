@@ -39,6 +39,8 @@ interface WorkspaceState {
   openNativeFolder: () => Promise<void>;
   /** Adapter a partir de upload de pasta (fallback). */
   openFromFileList: (list: FileList) => void;
+  /** Injeta adapter externo (ex.: nuvem). */
+  setExternalAdapter: (adapter: FsAdapter) => void;
   closeWorkspace: () => void;
   openFile: (path: string) => Promise<void>;
   closeTab: (path: string) => void;
