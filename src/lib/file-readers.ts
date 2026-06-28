@@ -15,6 +15,7 @@ const EXCLUDED_PATH_PARTS = ["node_modules/", ".git/", "dist/", "build/", ".next
 const MAX_TEXT_CHARS = 30_000;
 const MAX_ARCHIVE_CHARS = 80_000;
 const MAX_ARCHIVE_FILES = 35;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 function fileExtension(name: string): string {
   const clean = name.toLowerCase().split(/[?#]/)[0] ?? name.toLowerCase();
@@ -38,6 +39,15 @@ function formatBytes(size: number): string {
 
 function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}\n\n[conteúdo truncado: ${text.length - max} caracteres omitidos]` : text;
+}
+
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("Falha ao ler imagem."));
+    reader.readAsDataURL(file);
+  });
 }
 
 function archiveScore(path: string): number {
@@ -104,13 +114,17 @@ export async function readAttachment(file: File): Promise<AttachedFile> {
     }
 
     if (file.type.startsWith("image/")) {
+      const canInline = file.size <= MAX_IMAGE_BYTES;
       return {
         id: crypto.randomUUID(),
         name: file.name,
         type: file.type,
         size: file.size,
         kind: "image",
-        summary: `Imagem anexada (${formatBytes(file.size)}). O chat enviará metadados; use um modelo com visão para análise visual real.`,
+        summary: canInline
+          ? `Imagem lida (${formatBytes(file.size)}). Será enviada para modelos compatíveis com visão.`
+          : `Imagem anexada (${formatBytes(file.size)}), mas excede ${formatBytes(MAX_IMAGE_BYTES)} e será enviada apenas como metadados.`,
+        dataUrl: canInline ? await readAsDataUrl(file) : undefined,
       };
     }
 
