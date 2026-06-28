@@ -7,7 +7,6 @@ import { buildAttachmentContext } from "@/lib/file-readers";
 import {
   callChatCompletion,
   streamChatCompletion,
-  textFromContent,
   webSearch,
   type ChatMessage,
   type OpenAIContentPart,
@@ -154,7 +153,6 @@ export function ChatView() {
     try {
       // 1) Plano
       const planStep = pushStep({ status: "running", label: "Analisando a missão e gerando plano..." });
-      const attachmentContext = buildAttachmentContext(attachments);
       const plan = await callChatCompletion([
         {
           role: "system",
