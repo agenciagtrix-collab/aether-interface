@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, EyeOff, Save, RotateCcw, KeyRound, RefreshCw, Search, Check, Flame, AlertTriangle, Zap } from "lucide-react";
+import { Eye, EyeOff, Save, RotateCcw, KeyRound, RefreshCw, Search, Check, Flame, AlertTriangle, Zap, Bot, Unlock, Rocket, Info } from "lucide-react";
 import { toast } from "sonner";
 import { useSettings, type AIProvider } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
@@ -32,6 +32,73 @@ function classifyModel(id: string, label: string): { isUncensored: boolean; mayR
     isUncensored: UNCENSORED_PATTERNS.some((p) => lower.includes(p)),
     mayRateLimit: lower.includes(":free") && RATE_LIMITED_HINTS.some((p) => lower.includes(p)),
   };
+}
+
+interface QuickPreset {
+  id: string;
+  icon: typeof Bot;
+  label: string;
+  tooltip: string;
+  primaryId: string;
+  highlightIds: string[];
+  filterQuery: string;
+  accent: string;
+}
+
+const QUICK_PRESETS: QuickPreset[] = [
+  {
+    id: "advanced",
+    icon: Bot,
+    label: "🤖 Uso Geral Avançado (Hermes 405B)",
+    tooltip: "Ideal para o Modo Agente, tarefas ultra complexas, lógica avançada e programação de códigos pesados.",
+    primaryId: "nousresearch/hermes-3-llama-3.1-405b",
+    highlightIds: ["nousresearch/hermes-3-llama-3.1-405b"],
+    filterQuery: "hermes",
+    accent: "from-sky-500/20 to-indigo-500/20 border-sky-500/40 text-sky-300",
+  },
+  {
+    id: "uncensored",
+    icon: Unlock,
+    label: "🔓 Liberdade Total Sem Censura (Venice/Magnum)",
+    tooltip: "Ideal para qualquer pergunta sem filtros éticos ou morais, escrita criativa sem travas.",
+    primaryId: "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+    highlightIds: [
+      "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+      "anthracite-org/magnum-v4-72b",
+    ],
+    filterQuery: "venice",
+    accent: "from-orange-500/20 to-rose-500/20 border-orange-500/40 text-orange-300",
+  },
+  {
+    id: "fast",
+    icon: Rocket,
+    label: "⚡ Respostas Ultra Rápidas (Modelos menores 8B/13B)",
+    tooltip: "Perfeito para conversas rápidas do dia a dia, gastando o mínimo possível de processamento e créditos.",
+    primaryId: "gryphe/mythomax-l2-13b",
+    highlightIds: ["gryphe/mythomax-l2-13b"],
+    filterQuery: "mythomax",
+    accent: "from-emerald-500/20 to-teal-500/20 border-emerald-500/40 text-emerald-300",
+  },
+];
+
+// Descrições dinâmicas exibidas abaixo do modelo selecionado
+const MODEL_DESCRIPTIONS: { match: RegExp; text: string }[] = [
+  { match: /hermes-3-llama-3\.1-405b/i, text: "Recomendado para o Modo Agente, raciocínio profundo, programação complexa e tarefas que exigem 405B de parâmetros." },
+  { match: /hermes/i, text: "Família Hermes/Nous: ótimo equilíbrio entre seguir instruções e responder sem travas excessivas." },
+  { match: /venice|dolphin/i, text: "Recomendado para conversas totalmente livres, sem filtros morais/éticos, e escrita criativa sem censura." },
+  { match: /magnum/i, text: "Magnum v4 72B: especialista em roleplay imersivo, prosa criativa e diálogo natural sem censura." },
+  { match: /mythomax/i, text: "Recomendado para RPG, conversas longas e histórias sem censura. Leve, rápido e barato." },
+  { match: /deepseek-r1|qwq/i, text: "Modelo com raciocínio nativo — você verá o passo a passo do pensamento antes da resposta final." },
+  { match: /deepseek/i, text: "DeepSeek: excelente em código, matemática e raciocínio lógico. Custo-benefício alto." },
+  { match: /gpt-4o|claude|gemini/i, text: "Modelo premium multimodal — suporta visão (imagens) e tem alta capacidade geral." },
+  { match: /llama-3\.1-8b|llama-3-8b|8b/i, text: "Modelo leve 8B: respostas rápidas, ideal para chat do dia a dia com baixo consumo." },
+  { match: /:free/i, text: "Modelo gratuito — pode ter limites de rate. Em caso de erro 429, tente outro :free." },
+];
+
+function describeModel(id: string): string | null {
+  if (!id) return null;
+  const hit = MODEL_DESCRIPTIONS.find((d) => d.match.test(id));
+  return hit?.text ?? null;
 }
 
 
@@ -231,6 +298,39 @@ function ModelPicker({
         )}
       </div>
 
+      {/* Filtros Rápidos por Objetivo */}
+      <div className="mb-3 rounded-lg border border-border bg-gradient-to-br from-surface-2 to-surface-1 p-2.5">
+        <p className="mb-2 flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <Info className="h-3 w-3" /> Filtros rápidos por objetivo — escolha em 1 clique
+        </p>
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+          {QUICK_PRESETS.map((p) => {
+            const Icon = p.icon;
+            const active = p.highlightIds.includes(value);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                title={p.tooltip}
+                onClick={() => {
+                  setQuery(p.filterQuery);
+                  onChange(p.primaryId);
+                  toast.success(`Preset aplicado: ${p.label}`);
+                }}
+                className={cn(
+                  "group relative flex items-start gap-2 rounded-md border bg-gradient-to-br p-2 text-left text-[10px] transition-all hover:scale-[1.02] hover:shadow-lg",
+                  p.accent,
+                  active && "ring-2 ring-primary/60",
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="font-medium leading-tight">{p.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="relative mb-2">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
         <input
@@ -240,6 +340,7 @@ function ModelPicker({
           className="w-full rounded-md border border-input bg-surface-1 py-2 pl-8 pr-3 text-xs focus:border-primary/60 focus:outline-none"
         />
       </div>
+
 
       {error && (
         <p className="mb-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-[10px] text-destructive">
@@ -256,6 +357,7 @@ function ModelPicker({
         ) : (
           filtered.slice(0, 300).map((m) => {
             const mayRateLimit = m.isFree && /venice|auto/i.test(m.id);
+            const isPresetHighlighted = QUICK_PRESETS.some((p) => p.highlightIds.includes(m.id));
             return (
               <button
                 key={m.id}
@@ -264,10 +366,14 @@ function ModelPicker({
                 className={cn(
                   "flex w-full items-center justify-between gap-2 border-b border-border/50 px-3 py-2 text-left text-[11px] last:border-0 hover:bg-surface-3",
                   value === m.id && "bg-primary/10",
+                  isPresetHighlighted && value !== m.id && "bg-amber-500/5",
                 )}
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
+                    {isPresetHighlighted && (
+                      <span title="Recomendado por preset rápido">⭐</span>
+                    )}
                     {m.isUncensored && <Flame className="h-3 w-3 shrink-0 text-orange-400" />}
                     <p className="truncate font-medium">{m.label}</p>
                   </div>
@@ -302,6 +408,12 @@ function ModelPicker({
       <p className="mt-1.5 text-[10px] text-muted-foreground">
         Selecionado: <span className="font-mono text-primary">{value || "—"}</span>
       </p>
+      {describeModel(value) && (
+        <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-2.5 py-1.5 text-[10px] text-primary/90">
+          <Info className="mt-0.5 h-3 w-3 shrink-0" />
+          <span>{describeModel(value)}</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,16 +1,36 @@
 import { useRef, useState, type KeyboardEvent } from "react";
-import { Globe, Paperclip, SendHorizonal, X } from "lucide-react";
+import { Globe, Paperclip, SendHorizonal, X, FileText, FileArchive, Image as ImageIcon, FileQuestion, AlertCircle } from "lucide-react";
 import { usePanel } from "./PanelContext";
 import { cn } from "@/lib/utils";
-import { readAttachment } from "@/lib/file-readers";
+import { readAttachment, formatFileSize } from "@/lib/file-readers";
+import type { AttachedFile } from "./PanelContext";
 
 interface Props {
   onSubmit: (text: string) => void;
 }
 
+interface ReadingItem {
+  id: string;
+  name: string;
+  size: number;
+  phase: string;
+  loaded: number;
+  total: number;
+}
+
+function kindIcon(kind: AttachedFile["kind"]) {
+  switch (kind) {
+    case "text": return <FileText className="h-3.5 w-3.5 text-sky-400" />;
+    case "archive": return <FileArchive className="h-3.5 w-3.5 text-amber-400" />;
+    case "image": return <ImageIcon className="h-3.5 w-3.5 text-emerald-400" />;
+    case "error": return <AlertCircle className="h-3.5 w-3.5 text-destructive" />;
+    default: return <FileQuestion className="h-3.5 w-3.5 text-muted-foreground" />;
+  }
+}
+
 export function InputBox({ onSubmit }: Props) {
   const [value, setValue] = useState("");
-  const [isReadingFiles, setIsReadingFiles] = useState(false);
+  const [reading, setReading] = useState<ReadingItem[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const {
@@ -19,9 +39,12 @@ export function InputBox({ onSubmit }: Props) {
     toggleWebSearch,
     attachedFiles,
     addAttachedFile,
+    removeAttachedFile,
     clearAttachedFiles,
     isRunning,
   } = usePanel();
+
+  const isReadingFiles = reading.length > 0;
 
   const placeholder =
     mode === "agent"
@@ -52,39 +75,98 @@ export function InputBox({ onSubmit }: Props) {
 
   const onFiles = async (files: FileList | null) => {
     if (!files) return;
-    setIsReadingFiles(true);
-    try {
-      const parsed = await Promise.all(Array.from(files).map((file) => readAttachment(file)));
-      parsed.forEach((file) => addAttachedFile(file));
-    } finally {
-      setIsReadingFiles(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
+    const items: ReadingItem[] = Array.from(files).map((f) => ({
+      id: crypto.randomUUID(),
+      name: f.name,
+      size: f.size,
+      phase: "Aguardando",
+      loaded: 0,
+      total: 1,
+    }));
+    setReading((prev) => [...prev, ...items]);
+
+    await Promise.all(
+      Array.from(files).map(async (file, i) => {
+        const id = items[i].id;
+        const parsed = await readAttachment(file, ({ phase, loaded, total }) => {
+          setReading((prev) => prev.map((r) => (r.id === id ? { ...r, phase, loaded, total } : r)));
+        });
+        addAttachedFile(parsed);
+        setReading((prev) => prev.filter((r) => r.id !== id));
+      }),
+    );
+    if (fileRef.current) fileRef.current.value = "";
   };
 
   return (
     <div className="border-t border-border bg-background/80 px-6 py-4 backdrop-blur-sm">
       <div className="mx-auto max-w-3xl">
+        {/* Progresso de leitura */}
+        {reading.length > 0 && (
+          <div className="mb-2 space-y-1.5">
+            {reading.map((r) => {
+              const pct = Math.min(100, Math.round((r.loaded / Math.max(1, r.total)) * 100));
+              return (
+                <div key={r.id} className="rounded-md border border-border bg-surface-2 px-3 py-2">
+                  <div className="mb-1 flex items-center justify-between gap-2 text-[11px]">
+                    <span className="truncate font-medium">{r.name}</span>
+                    <span className="shrink-0 text-muted-foreground">{formatFileSize(r.size)} · {r.phase}</span>
+                  </div>
+                  <div className="h-1 overflow-hidden rounded-full bg-surface-3">
+                    <div
+                      className="h-full bg-primary transition-all duration-200"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Pré-visualização de anexos */}
         {attachedFiles.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-1.5">
-            {attachedFiles.map((f) => (
-              <span
-                key={f.id}
-                className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-2 py-1 text-xs"
-                title={f.summary}
+          <div className="mb-2 space-y-1.5">
+            <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
+              <span>{attachedFiles.length} anexo(s) prontos para envio</span>
+              <button
+                onClick={clearAttachedFiles}
+                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-surface-2 hover:text-foreground"
               >
-                <Paperclip className="h-3 w-3 text-muted-foreground" />
-                {f.name}
-              </span>
+                <X className="h-3 w-3" /> limpar tudo
+              </button>
+            </div>
+            {attachedFiles.map((f) => (
+              <div
+                key={f.id}
+                className="flex items-start gap-2 rounded-md border border-border bg-surface-2 px-3 py-2"
+              >
+                {f.kind === "image" && f.dataUrl ? (
+                  <img src={f.dataUrl} alt={f.name} className="h-10 w-10 shrink-0 rounded object-cover" />
+                ) : (
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-surface-3">
+                    {kindIcon(f.kind)}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-xs font-medium">{f.name}</p>
+                    <button
+                      onClick={() => removeAttachedFile(f.id)}
+                      className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-surface-3 hover:text-foreground"
+                      aria-label="Remover anexo"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <p className="truncate text-[10px] text-muted-foreground">
+                    {(f.type || f.kind)} · {formatFileSize(f.size)}
+                    {f.content && ` · ${f.content.length.toLocaleString()} chars extraídos`}
+                  </p>
+                  <p className="mt-0.5 truncate text-[10px] text-muted-foreground/80">{f.summary}</p>
+                </div>
+              </div>
             ))}
-            <button
-              onClick={clearAttachedFiles}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
-              aria-label="Remover anexos"
-            >
-              <X className="h-3 w-3" />
-              limpar
-            </button>
           </div>
         )}
 
@@ -147,7 +229,7 @@ export function InputBox({ onSubmit }: Props) {
               )}
               {isReadingFiles && (
                 <span className="ml-1 text-[10px] uppercase tracking-wider text-muted-foreground animate-pulse">
-                  lendo arquivo
+                  lendo {reading.length} arquivo(s)
                 </span>
               )}
             </div>
@@ -155,7 +237,7 @@ export function InputBox({ onSubmit }: Props) {
             <button
               type="button"
               onClick={submit}
-                disabled={(!value.trim() && attachedFiles.length === 0) || isRunning || isReadingFiles}
+              disabled={(!value.trim() && attachedFiles.length === 0) || isRunning || isReadingFiles}
               aria-label="Enviar mensagem"
               className={cn(
                 "flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-all",

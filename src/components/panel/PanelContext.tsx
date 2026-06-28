@@ -47,6 +47,7 @@ interface PanelState {
 
   attachedFiles: AttachedFile[];
   addAttachedFile: (file: AttachedFile) => void;
+  removeAttachedFile: (id: string) => void;
   clearAttachedFiles: () => void;
 
   messages: ChatMsg[];
@@ -87,6 +88,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
       toggleWebSearch: () => setWebSearch((v) => !v),
       attachedFiles,
       addAttachedFile: (file) => setAttachedFiles((f) => [...f, file]),
+      removeAttachedFile: (id) => setAttachedFiles((f) => f.filter((x) => x.id !== id)),
       clearAttachedFiles: () => setAttachedFiles([]),
       messages,
       addMessage: (m) => {
