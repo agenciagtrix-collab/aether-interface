@@ -215,8 +215,9 @@ function MobileShell({
             <SheetTitle className="text-xs">Pensamento do Agente</SheetTitle>
           </SheetHeader>
           <div className="h-[calc(60vh-3rem)] overflow-hidden">
-            <ThinkingTerminal />
+            <BottomTerminalTabs />
           </div>
+
         </SheetContent>
       </Sheet>
     </Tabs>
