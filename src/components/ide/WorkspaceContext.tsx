@@ -288,6 +288,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       edits,
       openNativeFolder,
       openFromFileList,
+      setExternalAdapter: (a: FsAdapter) => {
+        setAdapter(a);
+        setTabs([]);
+        setActivePath(null);
+      },
       closeWorkspace,
       openFile,
       closeTab,
