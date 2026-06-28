@@ -370,8 +370,18 @@ export function ChatView() {
     panel.clearAttachedFiles();
     panel.setRunning(true);
     try {
-      if (panel.mode === "agent") await runAgent(text, attachments);
-      else await runChat(text, attachments);
+      if (panel.mode === "agent") {
+        await runAgent(text, attachments);
+      } else {
+        // Roteamento LLM: só roteia se o usuário NÃO travou em uncensored.
+        let agentId: AgentId = activeAgent;
+        if (activeAgent !== "uncensored") {
+          panel.setStatusText("🧭 Roteando para o especialista ideal");
+          agentId = await routeToAgent(text);
+          setActiveAgent(agentId);
+        }
+        await runChat(text, attachments, { agentId });
+      }
     } finally {
       panel.setRunning(false);
     }
@@ -386,7 +396,10 @@ export function ChatView() {
             {panel.mode === "agent" ? "Modo Agente · multi-etapas" : "Modo Conversação"}
           </p>
         </div>
-        <ModeSwitcher />
+        <div className="flex items-center gap-2">
+          <AgentBadge active={activeAgent} onChange={setActiveAgent} />
+          <ModeSwitcher />
+        </div>
       </header>
 
       <div className="min-h-0 flex-1 overflow-hidden">
@@ -395,6 +408,18 @@ export function ChatView() {
 
       <CodeContextBar onContextChange={handleCodeCtx} />
       <InputBox onSubmit={handleSubmit} />
+
+      <UncensoredModal
+        open={refusalOpen}
+        onClose={() => setRefusalOpen(false)}
+        onConfirm={(modelId) => {
+          const id = lastAssistantIdRef.current;
+          if (id) void resendWithUncensored(id, modelId);
+        }}
+      />
     </div>
+  );
+}
+
   );
 }
