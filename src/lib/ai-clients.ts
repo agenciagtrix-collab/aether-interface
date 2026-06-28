@@ -1,133 +1,134 @@
 /**
- * AI Clients — funções de integração REAL (comentadas).
+ * AI Clients — chamadas REAIS para OpenRouter / Groq / Tavily.
  *
- * Este arquivo é um esqueleto pronto para uso quando você baixar o projeto
- * e quiser conectar suas chaves reais. Descomente as funções abaixo e
- * importe-as nos handlers do ChatView / ThinkingTerminal.
+ * Lê as credenciais diretamente do localStorage usando as chaves padrão:
+ *   - jarvis_api_key     → chave do provedor (OpenRouter ou Groq)
+ *   - jarvis_model       → modelo escolhido
+ *   - jarvis_search_key  → chave do Tavily (busca web)
+ *   - jarvis_provider    → "openrouter" | "groq"
  *
- * ⚠️ AVISO DE SEGURANÇA:
- *   Chamar APIs diretamente do navegador EXPÕE sua API key para qualquer
- *   pessoa que abrir o DevTools. Use isso apenas localmente. Para produção,
- *   coloque um proxy (Edge Function / backend) entre o front-end e o provedor.
- *
- * ⚠️ CORS:
- *   - OpenRouter: aceita chamadas diretas do browser (envie header
- *     `HTTP-Referer` e `X-Title`).
- *   - GroqCloud: aceita chamadas diretas do browser.
- *   - Tavily / Serper: aceitam chamadas diretas, mas leia a doc de cada um.
+ * ⚠️ As chamadas saem direto do navegador → expõem a API key no DevTools.
+ *    Use somente localmente. Em produção, coloque um proxy/Edge Function.
  */
-
-import type { Settings } from "@/hooks/use-settings";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
 }
 
-// -----------------------------------------------------------------------------
-// 1) Chat completion (OpenRouter ou Groq — ambos seguem o esquema OpenAI)
-// -----------------------------------------------------------------------------
-//
-// export async function callChatCompletion(
-//   messages: ChatMessage[],
-//   settings: Settings,
-//   signal?: AbortSignal,
-// ): Promise<string> {
-//   const url =
-//     settings.provider === "groq"
-//       ? "https://api.groq.com/openai/v1/chat/completions"
-//       : "https://openrouter.ai/api/v1/chat/completions";
-//
-//   const res = await fetch(url, {
-//     method: "POST",
-//     signal,
-//     headers: {
-//       "Content-Type": "application/json",
-//       Authorization: `Bearer ${settings.apiKey}`,
-//       // Headers extras recomendados pelo OpenRouter:
-//       ...(settings.provider === "openrouter" && {
-//         "HTTP-Referer": window.location.origin,
-//         "X-Title": "Painel de IA Autônomo",
-//       }),
-//     },
-//     body: JSON.stringify({
-//       model: settings.model,
-//       messages,
-//       temperature: 0.7,
-//       stream: false,
-//     }),
-//   });
-//
-//   if (!res.ok) {
-//     const text = await res.text();
-//     throw new Error(`Provedor retornou ${res.status}: ${text}`);
-//   }
-//
-//   const data = await res.json();
-//   return data.choices?.[0]?.message?.content ?? "";
-// }
+export interface SearchResult {
+  title: string;
+  url: string;
+  content: string;
+}
 
-// -----------------------------------------------------------------------------
-// 2) Web search (Tavily ou Serper)
-// -----------------------------------------------------------------------------
-//
-// export interface SearchResult {
-//   title: string;
-//   url: string;
-//   snippet: string;
-// }
-//
-// export async function webSearch(
-//   query: string,
-//   settings: Settings,
-// ): Promise<SearchResult[]> {
-//   // --- Tavily ---
-//   // const res = await fetch("https://api.tavily.com/search", {
-//   //   method: "POST",
-//   //   headers: { "Content-Type": "application/json" },
-//   //   body: JSON.stringify({
-//   //     api_key: settings.webSearchApiKey,
-//   //     query,
-//   //     max_results: 5,
-//   //     search_depth: "basic",
-//   //   }),
-//   // });
-//   // const data = await res.json();
-//   // return (data.results ?? []).map((r: any) => ({
-//   //   title: r.title, url: r.url, snippet: r.content,
-//   // }));
-//
-//   // --- Serper ---
-//   // const res = await fetch("https://google.serper.dev/search", {
-//   //   method: "POST",
-//   //   headers: {
-//   //     "Content-Type": "application/json",
-//   //     "X-API-KEY": settings.webSearchApiKey,
-//   //   },
-//   //   body: JSON.stringify({ q: query, num: 5 }),
-//   // });
-//   // const data = await res.json();
-//   // return (data.organic ?? []).map((r: any) => ({
-//   //   title: r.title, url: r.link, snippet: r.snippet,
-//   // }));
-//
-//   throw new Error("webSearch não implementado — descomente o bloco do provedor escolhido.");
-// }
+function ls(key: string, fallback = ""): string {
+  if (typeof window === "undefined") return fallback;
+  try {
+    return window.localStorage.getItem(key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
-// -----------------------------------------------------------------------------
-// 3) Loop do agente autônomo (esqueleto)
-// -----------------------------------------------------------------------------
-//
-// Pseudocódigo de orquestração:
-//   1. recebe missão do usuário
-//   2. pede ao LLM um plano em passos JSON
-//   3. para cada passo:
-//      - se requer busca, chama webSearch()
-//      - injeta resultado como mensagem `system` no contexto
-//      - chama callChatCompletion() pedindo a próxima ação
-//   4. quando o LLM responder com {done:true}, retorna a síntese final
-//
-// Para alimentar o ThinkingTerminal, exporte um callback `onStep` que
-// recebe { label, status } e use o context do painel para empilhar os steps.
+export function getCredentials() {
+  return {
+    provider: (ls("jarvis_provider", "openrouter") as "openrouter" | "groq"),
+    apiKey: ls("jarvis_api_key"),
+    model: ls("jarvis_model", "nousresearch/hermes-3-llama-3.1-8b"),
+    searchKey: ls("jarvis_search_key"),
+  };
+}
 
-export type { Settings };
+/** Chat completion contra OpenRouter ou Groq (ambos seguem o esquema OpenAI). */
+export async function callChatCompletion(
+  messages: ChatMessage[],
+  opts: { signal?: AbortSignal; temperature?: number } = {},
+): Promise<string> {
+  const { provider, apiKey, model } = getCredentials();
+  if (!apiKey) {
+    throw new Error(
+      "Nenhuma chave de API encontrada. Abra Configurações e salve sua chave.",
+    );
+  }
+  if (!model) throw new Error("Nenhum modelo definido em Configurações.");
+
+  const url =
+    provider === "groq"
+      ? "https://api.groq.com/openai/v1/chat/completions"
+      : "https://openrouter.ai/api/v1/chat/completions";
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${apiKey}`,
+  };
+  if (provider === "openrouter" && typeof window !== "undefined") {
+    headers["HTTP-Referer"] = window.location.origin;
+    headers["X-Title"] = "Painel de IA Autônomo";
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    signal: opts.signal,
+    headers,
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: opts.temperature ?? 0.7,
+      stream: false,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`${provider} retornou ${res.status}: ${text || res.statusText}`);
+  }
+
+  const data = await res.json();
+  const content = data?.choices?.[0]?.message?.content;
+  if (typeof content !== "string") {
+    throw new Error("Resposta inesperada do provedor (sem choices[0].message.content).");
+  }
+  return content;
+}
+
+/** Pesquisa web via Tavily. */
+export async function webSearch(
+  query: string,
+  opts: { signal?: AbortSignal; maxResults?: number } = {},
+): Promise<SearchResult[]> {
+  const { searchKey } = getCredentials();
+  if (!searchKey) {
+    throw new Error(
+      "Nenhuma chave de busca web encontrada. Salve a chave Tavily em Configurações.",
+    );
+  }
+
+  const res = await fetch("https://api.tavily.com/search", {
+    method: "POST",
+    signal: opts.signal,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      api_key: searchKey,
+      query,
+      max_results: opts.maxResults ?? 5,
+      search_depth: "basic",
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Tavily retornou ${res.status}: ${text || res.statusText}`);
+  }
+
+  const data = await res.json();
+  return (data?.results ?? []).map((r: any) => ({
+    title: String(r.title ?? ""),
+    url: String(r.url ?? ""),
+    content: String(r.content ?? ""),
+  }));
+}
+
+export function hasCredentials(): boolean {
+  return getCredentials().apiKey.trim().length > 0;
+}
