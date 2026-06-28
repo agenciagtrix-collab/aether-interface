@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, User, Sparkles, Paperclip, Brain, ChevronDown } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { usePanel } from "./PanelContext";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +33,17 @@ function ThinkingBlock({ text }: { text: string }) {
         <pre className="max-h-56 overflow-y-auto whitespace-pre-wrap border-t border-border px-2.5 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
           {text}
         </pre>
+      )}
+    </div>
+  );
+}
+
+function MarkdownMessage({ content, streaming }: { content: string; streaming?: boolean }) {
+  return (
+    <div className="prose prose-invert max-w-none prose-p:my-2 prose-pre:my-3 prose-pre:overflow-x-auto prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-background/70 prose-pre:p-3 prose-code:font-mono prose-code:text-[0.86em] prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 text-sm leading-relaxed">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+      {streaming && (
+        <span className="ml-0.5 inline-block h-3 w-1.5 translate-y-0.5 bg-primary caret-blink" />
       )}
     </div>
   );
@@ -100,12 +113,16 @@ export function MessageList() {
               {m.role === "assistant" && m.thinking && <ThinkingBlock text={m.thinking} />}
 
               {m.content ? (
-                <p className="whitespace-pre-wrap">
-                  {m.content}
-                  {m.streaming && (
-                    <span className="ml-0.5 inline-block h-3 w-1.5 translate-y-0.5 bg-primary caret-blink" />
-                  )}
-                </p>
+                m.role === "assistant" ? (
+                  <MarkdownMessage content={m.content} streaming={m.streaming} />
+                ) : (
+                  <p className="whitespace-pre-wrap">
+                    {m.content}
+                    {m.streaming && (
+                      <span className="ml-0.5 inline-block h-3 w-1.5 translate-y-0.5 bg-primary caret-blink" />
+                    )}
+                  </p>
+                )
               ) : m.streaming ? (
                 <span className="inline-flex items-center gap-2 text-muted-foreground">
                   <Brain className="h-3.5 w-3.5 text-primary animate-pulse" />
@@ -115,18 +132,19 @@ export function MessageList() {
 
               {m.attachments && m.attachments.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {m.attachments.map((f, i) => (
+                  {m.attachments.map((f) => (
                     <span
-                      key={i}
+                      key={f.id}
                       className={cn(
                         "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px]",
                         m.role === "user"
                           ? "border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground"
                           : "border-border bg-background/40 text-muted-foreground",
                       )}
+                      title={f.summary}
                     >
                       <Paperclip className="h-3 w-3" />
-                      {f}
+                      {f.name}
                     </span>
                   ))}
                 </div>

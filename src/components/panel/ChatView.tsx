@@ -2,6 +2,8 @@ import { ModeSwitcher } from "./ModeSwitcher";
 import { MessageList } from "./MessageList";
 import { InputBox } from "./InputBox";
 import { usePanel, type TerminalStep } from "./PanelContext";
+import type { AttachedFile } from "./PanelContext";
+import { buildAttachmentContext } from "@/lib/file-readers";
 import {
   callChatCompletion,
   streamChatCompletion,
@@ -44,16 +46,18 @@ export function ChatView() {
   const REASONING_SYSTEM =
     "Você é um assistente cuidadoso. Antes de responder, pense passo a passo dentro de um bloco <think>...</think> " +
     "explicando seu raciocínio. Em seguida, FORA do bloco, escreva a resposta final ao usuário em português, " +
-    "clara e bem formatada. Sempre inclua o bloco <think> antes da resposta.";
+    "clara e bem formatada. Sempre inclua o bloco <think> antes da resposta. " +
+    "Quando precisar mostrar código, use Markdown com fences triplas, por exemplo ```tsx.";
 
-  const runChat = async (text: string, attachments: string[]) => {
+  const runChat = async (text: string, attachments: AttachedFile[]) => {
     panel.setStatusText("Pensando");
     const asstId = panel.addMessage({ role: "assistant", mode: "chat", content: "", streaming: true });
 
+    const attachmentContext = buildAttachmentContext(attachments);
     const userTurn: ChatMessage = {
       role: "user",
-      content: attachments.length
-        ? `${text}\n\n[Arquivos anexados: ${attachments.join(", ")}]`
+      content: attachmentContext
+        ? `${text}\n\n[Contexto real dos arquivos anexados]\n${attachmentContext}`
         : text,
     };
 
@@ -121,20 +125,21 @@ export function ChatView() {
     }
   };
 
-  const runAgent = async (text: string, attachments: string[]) => {
+  const runAgent = async (text: string, attachments: AttachedFile[]) => {
     panel.clearTerminal();
     panel.setStatusText("Analisando missão");
 
     try {
       // 1) Plano
       const planStep = pushStep({ status: "running", label: "Analisando a missão e gerando plano..." });
+      const attachmentContext = buildAttachmentContext(attachments);
       const plan = await callChatCompletion([
         {
           role: "system",
           content:
             "Você é um agente autônomo. Responda APENAS com uma lista numerada curta (3 a 6 passos) descrevendo como executar a missão. Sem preâmbulo.",
         },
-        { role: "user", content: text },
+        { role: "user", content: attachmentContext ? `${text}\n\n[Arquivos anexados]\n${attachmentContext}` : text },
       ]);
       updateStep(planStep, { status: "done", detail: plan });
 
@@ -166,8 +171,8 @@ export function ChatView() {
       if (attachments.length > 0) {
         pushStep({
           status: "done",
-          label: "Anexos registrados (somente nomes nesta versão)",
-          detail: attachments.join(", "),
+          label: "Arquivos lidos e enviados ao modelo",
+          detail: attachments.map((file) => `• ${file.name}: ${file.summary}`).join("\n"),
         });
       }
 
@@ -218,7 +223,7 @@ export function ChatView() {
           ...buildHistory(),
           {
             role: "user",
-            content: `Missão: ${text}${attachments.length ? `\nAnexos: ${attachments.join(", ")}` : ""}\n\nPlano:\n${plan}\n\nExecute agora.`,
+            content: `Missão: ${text}${attachmentContext ? `\n\n[Arquivos anexados]\n${attachmentContext}` : ""}\n\nPlano:\n${plan}\n\nExecute agora.`,
           },
         ],
         { onDelta: flush, temperature: 0.7 },
