@@ -285,7 +285,7 @@ function IdeShellInner() {
         <PanelGroup
           id="ide-root-layout"
           orientation="horizontal"
-          autoSaveId="ide-root-layout-v1"
+          autoSave="ide-root-layout-v1"
           resizeTargetMinimumSize={{ coarse: 28, fine: 10 }}
           className="h-full min-h-0 min-w-0 flex-1"
         >
@@ -293,7 +293,6 @@ function IdeShellInner() {
             <>
               <Panel
                 id="ide-sidebar"
-                order={1}
                 defaultSize="18%"
                 minSize="200px"
                 maxSize="420px"
@@ -308,17 +307,15 @@ function IdeShellInner() {
             </>
           )}
 
-          <Panel id="ide-editor-stack" order={2} defaultSize="52%" minSize="320px" style={{ overflow: "hidden" }}>
             <PanelGroup
               id="ide-editor-layout"
               orientation="vertical"
-              autoSaveId="ide-editor-layout-v1"
+              autoSave="ide-editor-layout-v1"
               resizeTargetMinimumSize={{ coarse: 28, fine: 10 }}
               className="h-full min-h-0 w-full min-w-0"
             >
               <Panel
                 id="ide-editor"
-                order={1}
                 defaultSize={effectiveShowTerminal ? "70%" : "100%"}
                 minSize="200px"
                 style={{ overflow: "hidden" }}
@@ -332,7 +329,6 @@ function IdeShellInner() {
                   <ResizeHandle orientation="vertical" />
                   <Panel
                     id="ide-thinking-terminal"
-                    order={2}
                     defaultSize="30%"
                     minSize="140px"
                     maxSize="60%"
@@ -353,7 +349,6 @@ function IdeShellInner() {
               <ResizeHandle orientation="horizontal" />
               <Panel
                 id="ide-chat"
-                order={3}
                 defaultSize="30%"
                 minSize="300px"
                 maxSize="560px"
