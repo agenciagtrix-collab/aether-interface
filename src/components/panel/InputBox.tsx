@@ -30,7 +30,7 @@ export function InputBox({ onSubmit }: Props) {
 
   const submit = () => {
     const t = value.trim();
-    if (!t || isRunning) return;
+    if (!t || isRunning || isReadingFiles) return;
     onSubmit(t);
     setValue("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
@@ -155,7 +155,7 @@ export function InputBox({ onSubmit }: Props) {
             <button
               type="button"
               onClick={submit}
-              disabled={!value.trim() || isRunning}
+              disabled={!value.trim() || isRunning || isReadingFiles}
               aria-label="Enviar mensagem"
               className={cn(
                 "flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-all",

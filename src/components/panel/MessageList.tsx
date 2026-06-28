@@ -40,8 +40,33 @@ function ThinkingBlock({ text }: { text: string }) {
 
 function MarkdownMessage({ content, streaming }: { content: string; streaming?: boolean }) {
   return (
-    <div className="prose prose-invert max-w-none prose-p:my-2 prose-pre:my-3 prose-pre:overflow-x-auto prose-pre:rounded-lg prose-pre:border prose-pre:border-border prose-pre:bg-background/70 prose-pre:p-3 prose-code:font-mono prose-code:text-[0.86em] prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 text-sm leading-relaxed">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    <div className="space-y-2 text-sm leading-relaxed">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p: ({ children }) => <p className="whitespace-pre-wrap">{children}</p>,
+          ul: ({ children }) => <ul className="ml-5 list-disc space-y-1">{children}</ul>,
+          ol: ({ children }) => <ol className="ml-5 list-decimal space-y-1">{children}</ol>,
+          li: ({ children }) => <li className="pl-1">{children}</li>,
+          pre: ({ children }) => (
+            <pre className="my-3 max-w-full overflow-x-auto rounded-lg border border-border bg-background/70 p-3 text-xs leading-relaxed">
+              {children}
+            </pre>
+          ),
+          code: ({ children, className }) => (
+            <code className={cn("rounded bg-background/60 px-1 py-0.5 font-mono text-[0.86em]", className)}>
+              {children}
+            </code>
+          ),
+          a: ({ children, href }) => (
+            <a href={href} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
       {streaming && (
         <span className="ml-0.5 inline-block h-3 w-1.5 translate-y-0.5 bg-primary caret-blink" />
       )}
