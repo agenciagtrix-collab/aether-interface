@@ -621,26 +621,57 @@ export function SettingsView() {
 }
 
 function AutoApplySection() {
-  const [enabled, setEnabled] = useState(
-    () => typeof window !== "undefined" && localStorage.getItem("jarvis_auto_apply") === "1",
-  );
-  const toggle = () => {
-    const next = !enabled;
-    setEnabled(next);
-    localStorage.setItem("jarvis_auto_apply", next ? "1" : "0");
-    toast.success(next ? "Auto-aplicar ativado" : "Auto-aplicar desativado");
+  const [mode, setMode] = useState<"off" | "ask" | "always">(() => {
+    if (typeof window === "undefined") return "off";
+    const v = localStorage.getItem("jarvis_auto_apply_mode");
+    if (v === "always" || v === "ask" || v === "off") return v;
+    return localStorage.getItem("jarvis_auto_apply") === "1" ? "ask" : "off";
+  });
+  const update = (next: "off" | "ask" | "always") => {
+    setMode(next);
+    localStorage.setItem("jarvis_auto_apply_mode", next);
+    localStorage.setItem("jarvis_auto_apply", next === "off" ? "0" : "1");
+    toast.success(
+      next === "always"
+        ? "Auto-aplicar TOTAL ativado — sem perguntas"
+        : next === "ask"
+          ? "Auto-aplicar com confirmação ativado"
+          : "Auto-aplicar desativado",
+    );
   };
+  const options: Array<{ id: "off" | "ask" | "always"; label: string; desc: string }> = [
+    { id: "off", label: "Desativado", desc: "Você clica em 'Aplicar' em cada bloco." },
+    { id: "ask", label: "Perguntar 1x por arquivo", desc: "Confirma antes de gravar — funciona em chat e agente." },
+    { id: "always", label: "Sempre aplicar (sem perguntar)", desc: "Grava todo bloco com caminho automaticamente. Reverta no histórico se precisar." },
+  ];
   return (
     <section className="rounded-xl border border-border bg-surface-1 p-5">
-      <h2 className="mb-1 text-sm font-semibold">Auto-aplicar edições (Modo Agente)</h2>
+      <h2 className="mb-1 text-sm font-semibold">Auto-aplicar edições</h2>
       <p className="mb-4 text-xs text-muted-foreground">
-        Quando ativo, blocos de código com caminho (<span className="font-mono text-primary">```ts:src/x.ts</span>)
-        recebidos no modo Agente abrem uma confirmação para gravar direto no arquivo, sem clique manual.
+        Controla como blocos <span className="font-mono text-primary">```lang:caminho</span> são gravados no
+        workspace. Edições ficam no histórico e podem ser revertidas.
       </p>
-      <label className="flex cursor-pointer items-center gap-3">
-        <input type="checkbox" checked={enabled} onChange={toggle} className="h-4 w-4 accent-primary" />
-        <span className="text-xs">Ativar auto-aplicar com confirmação</span>
-      </label>
+      <div className="space-y-2">
+        {options.map((o) => (
+          <label key={o.id} className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-background/40 p-3 hover:border-primary/50">
+            <input
+              type="radio"
+              name="auto-apply-mode"
+              checked={mode === o.id}
+              onChange={() => update(o.id)}
+              className="mt-0.5 h-4 w-4 accent-primary"
+            />
+            <span>
+              <span className="block text-xs font-medium">{o.label}</span>
+              <span className="block text-[11px] text-muted-foreground">{o.desc}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      <p className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-300">
+        ⚠️ Execução de comandos de terminal (npm install, git, etc.) não roda direto no navegador
+        por sandbox. A IA gera os comandos prontos para você colar no seu terminal local.
+      </p>
     </section>
   );
 }
