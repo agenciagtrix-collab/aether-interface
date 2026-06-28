@@ -185,6 +185,21 @@ export function MessageList({ onResendUncensored }: MessageListProps = {}) {
                   <Sparkles className="h-3 w-3" /> resposta do agente
                 </span>
               )}
+
+              {m.role === "assistant" && m.content && !m.streaming && onResendUncensored && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => onResendUncensored(m.id)}
+                    disabled={isRunning}
+                    className="inline-flex items-center gap-1 rounded-md border border-orange-500/40 bg-orange-500/10 px-2 py-0.5 text-[10px] font-medium text-orange-300 transition-colors hover:bg-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Reenvia a sua última pergunta para o modelo uncensored definido em Configurações."
+                  >
+                    <Unlock className="h-3 w-3" />
+                    Reenviar para Modelo Uncensored
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ))}
