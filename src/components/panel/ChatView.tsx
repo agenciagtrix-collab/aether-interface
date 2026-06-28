@@ -1,11 +1,15 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ModeSwitcher } from "./ModeSwitcher";
 import { MessageList } from "./MessageList";
 import { InputBox } from "./InputBox";
+import { AgentBadge } from "./AgentBadge";
+import { UncensoredModal } from "./UncensoredModal";
 import { usePanel, type TerminalStep } from "./PanelContext";
 import type { AttachedFile } from "./PanelContext";
 import { buildAttachmentContext } from "@/lib/file-readers";
 import { CodeContextBar } from "@/components/ide/CodeContextBar";
+import { AGENTS, type AgentId } from "@/lib/agents";
+import { routeToAgent, isRefusal } from "@/lib/orchestrator";
 import {
   callChatCompletion,
   streamChatCompletion,
@@ -15,6 +19,8 @@ import {
 } from "@/lib/ai-clients";
 
 const uid = () => crypto.randomUUID();
+const ACTIVE_AGENT_KEY = "jarvis_active_agent";
+
 
 // extrai blocos <think>...</think> separando raciocínio da resposta final
 function splitThinking(raw: string): { thinking: string; answer: string } {
