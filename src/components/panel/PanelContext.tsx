@@ -47,6 +47,7 @@ interface PanelState {
 
   attachedFiles: AttachedFile[];
   addAttachedFile: (file: AttachedFile) => void;
+  removeAttachedFile: (id: string) => void;
   clearAttachedFiles: () => void;
 
   messages: ChatMsg[];
