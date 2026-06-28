@@ -622,6 +622,68 @@ export function SettingsView() {
   );
 }
 
+function DaemonSection() {
+  const [url, setUrl] = useState(
+    () => (typeof window !== "undefined" && localStorage.getItem("jarvis_daemon_url")) || "ws://localhost:17345",
+  );
+  const [token, setToken] = useState(
+    () => (typeof window !== "undefined" && localStorage.getItem("jarvis_daemon_token")) || "",
+  );
+  const save = () => {
+    localStorage.setItem("jarvis_daemon_url", url.trim());
+    localStorage.setItem("jarvis_daemon_token", token.trim());
+    toast.success("Daemon configurado. Abra o painel Terminal Real na IDE.");
+  };
+  return (
+    <section className="rounded-xl border border-border bg-surface-1 p-5">
+      <div className="mb-1 flex items-center gap-2">
+        <Zap className="h-4 w-4 text-primary" />
+        <h2 className="text-sm font-semibold">Daemon Local (Terminal Real)</h2>
+      </div>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Permite execução real de comandos no seu computador, com autorização explícita por comando. Dois modos:
+        <br />• <b>Electron</b>: empacote o app com <span className="font-mono">electron/main.cjs</span> — conecta automático.
+        <br />• <b>Browser</b>: rode <span className="font-mono text-primary">node daemon/server.cjs</span> e preencha abaixo.
+      </p>
+      <div className="space-y-2">
+        <label className="block text-xs font-medium">URL do Daemon (WebSocket)</label>
+        <input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="ws://localhost:17345"
+          className="w-full rounded-md border border-border bg-surface-2 px-3 py-2 font-mono text-xs outline-none focus:border-primary/60"
+        />
+        <label className="block text-xs font-medium">Token</label>
+        <input
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="copie o token impresso no terminal do daemon"
+          className="w-full rounded-md border border-border bg-surface-2 px-3 py-2 font-mono text-xs outline-none focus:border-primary/60"
+        />
+      </div>
+      <div className="mt-3 flex justify-end">
+        <button
+          onClick={save}
+          className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
+        >
+          <Save className="h-3.5 w-3.5" />
+          Salvar
+        </button>
+      </div>
+      <pre className="mt-3 overflow-x-auto rounded-md border border-border bg-surface-2 p-2 text-[10px] leading-relaxed text-muted-foreground">
+{`# 1) instale uma vez
+npm i ws
+
+# 2) rode o daemon (anote URL + token impressos)
+JARVIS_TOKEN=meutoken JARVIS_PORT=17345 \\
+JARVIS_CWD=/caminho/do/projeto \\
+node daemon/server.cjs`}
+      </pre>
+    </section>
+  );
+}
+
+
 function AutoApplySection() {
   const [mode, setMode] = useState<"off" | "ask" | "always">(() => {
     if (typeof window === "undefined") return "off";
