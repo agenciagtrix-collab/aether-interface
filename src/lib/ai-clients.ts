@@ -32,7 +32,7 @@ export function getCredentials() {
   return {
     provider: ls("jarvis_provider", "openrouter") as "openrouter" | "groq",
     apiKey: ls("jarvis_api_key"),
-    model: ls("jarvis_model", "nousresearch/hermes-3-llama-3.1-8b"),
+    model: ls("jarvis_model", "deepseek/deepseek-chat-v3.1:free"),
     searchKey: ls("jarvis_search_key"),
   };
 }

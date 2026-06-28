@@ -383,7 +383,7 @@ export function SettingsView() {
     setLocal({
       provider: "openrouter",
       apiKey: "",
-      model: "nousresearch/hermes-3-llama-3.1-8b",
+      model: "deepseek/deepseek-chat-v3.1:free",
       webSearchApiKey: "",
     });
     toast.info("Configurações restauradas.");
