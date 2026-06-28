@@ -1,13 +1,18 @@
-import { useMemo, useState } from "react";
-import { Check, FileCode2, Loader2, Plus } from "lucide-react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Check, FileCode2, GitCompare, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useWorkspace } from "@/components/ide/WorkspaceContext";
+import { usePanel } from "@/components/panel/PanelContext";
 import { cn } from "@/lib/utils";
 
+const DiffEditor = lazy(() =>
+  import("@monaco-editor/react").then((m) => ({ default: m.DiffEditor })),
+);
+
 /**
- * Detecta blocos do tipo ```lang:caminho/arquivo.ext e renderiza
- * um header com botão "Aplicar ao arquivo". Quando não há caminho,
- * cai no <pre> padrão.
+ * Detecta blocos ```lang:caminho/arquivo.ext e renderiza header
+ * com Diff inline (Monaco) + botão "Aplicar". Auto-aplica quando
+ * o usuário ativou em Configurações e está em modo Agente.
  */
 export function CodeBlock({
   className,
@@ -17,10 +22,13 @@ export function CodeBlock({
   children: React.ReactNode;
 }) {
   const { adapter, applyEdit, supportsWrite } = useWorkspace();
+  const { mode } = usePanel();
   const [applied, setApplied] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
+  const [previous, setPrevious] = useState<string | null>(null);
+  const autoTriedRef = useRef(false);
 
-  // react-markdown passa "language-xxx" — pode conter ":path"
   const meta = useMemo(() => {
     const raw = (className ?? "").replace(/^language-/, "");
     if (!raw) return { lang: "plaintext", path: null as string | null };
@@ -30,7 +38,6 @@ export function CodeBlock({
   }, [className]);
 
   const code = useMemo(() => {
-    // children pode ser string ou array; coleta texto puro
     const collect = (n: React.ReactNode): string => {
       if (n == null || typeof n === "boolean") return "";
       if (typeof n === "string" || typeof n === "number") return String(n);
@@ -43,15 +50,21 @@ export function CodeBlock({
     return collect(children).replace(/\n$/, "");
   }, [children]);
 
-  if (!meta.path) {
-    return (
-      <code className={cn("rounded bg-background/60 px-1 py-0.5 font-mono text-[0.86em]", className)}>
-        {children}
-      </code>
-    );
-  }
+  // Carrega conteúdo anterior do disco quando o usuário abre o diff
+  useEffect(() => {
+    if (!showDiff || !adapter || !meta.path || previous !== null) return;
+    let cancel = false;
+    adapter
+      .readText(meta.path)
+      .then((txt) => !cancel && setPrevious(txt))
+      .catch(() => !cancel && setPrevious(""));
+    return () => {
+      cancel = true;
+    };
+  }, [showDiff, adapter, meta.path, previous]);
 
-  const handleApply = async () => {
+  const doApply = async () => {
+    if (!meta.path) return;
     if (!adapter) {
       toast.error("Abra uma pasta de trabalho na IDE primeiro.");
       return;
@@ -61,10 +74,30 @@ export function CodeBlock({
       return;
     }
     setBusy(true);
-    const result = await applyEdit(meta.path!, code);
+    const result = await applyEdit(meta.path, code);
     setBusy(false);
     if (result) setApplied(true);
   };
+
+  // Auto-apply opcional (modo Agente + confirmação)
+  useEffect(() => {
+    if (autoTriedRef.current || applied || !meta.path || !adapter || !supportsWrite) return;
+    if (mode !== "agent") return;
+    const enabled = typeof window !== "undefined" && localStorage.getItem("jarvis_auto_apply") === "1";
+    if (!enabled) return;
+    autoTriedRef.current = true;
+    const ok = window.confirm(`Aplicar automaticamente edição em "${meta.path}"?`);
+    if (ok) void doApply();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, meta.path, adapter, supportsWrite, applied]);
+
+  if (!meta.path) {
+    return (
+      <code className={cn("rounded bg-background/60 px-1 py-0.5 font-mono text-[0.86em]", className)}>
+        {children}
+      </code>
+    );
+  }
 
   return (
     <div className="my-3 overflow-hidden rounded-lg border border-border bg-background/70">
@@ -76,31 +109,73 @@ export function CodeBlock({
             {meta.lang}
           </span>
         </span>
-        <button
-          type="button"
-          onClick={handleApply}
-          disabled={busy || applied}
-          className={cn(
-            "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-medium transition-colors",
-            applied
-              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
-              : "border-primary/50 bg-primary/15 text-primary hover:bg-primary/25",
-            (busy || applied) && "cursor-not-allowed opacity-80",
-          )}
-        >
-          {busy ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : applied ? (
-            <Check className="h-3 w-3" />
-          ) : (
-            <Plus className="h-3 w-3" />
-          )}
-          {applied ? "Aplicado" : busy ? "Aplicando..." : "Aplicar"}
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setShowDiff((v) => !v)}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-medium transition-colors",
+              showDiff
+                ? "border-primary/50 bg-primary/15 text-primary"
+                : "border-border bg-background/60 text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <GitCompare className="h-3 w-3" />
+            {showDiff ? "Ocultar diff" : "Ver diff"}
+          </button>
+          <button
+            type="button"
+            onClick={doApply}
+            disabled={busy || applied}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-medium transition-colors",
+              applied
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                : "border-primary/50 bg-primary/15 text-primary hover:bg-primary/25",
+              (busy || applied) && "cursor-not-allowed opacity-80",
+            )}
+          >
+            {busy ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : applied ? (
+              <Check className="h-3 w-3" />
+            ) : (
+              <Plus className="h-3 w-3" />
+            )}
+            {applied ? "Aplicado" : busy ? "Aplicando..." : "Aplicar"}
+          </button>
+        </div>
       </div>
-      <pre className="max-w-full overflow-x-auto p-3 text-xs leading-relaxed">
-        <code className={cn("font-mono", className)}>{code}</code>
-      </pre>
+
+      {showDiff ? (
+        <div className="h-[320px] w-full bg-[#1e1e1e]">
+          <Suspense
+            fallback={
+              <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Carregando diff...
+              </div>
+            }
+          >
+            <DiffEditor
+              original={previous ?? ""}
+              modified={code}
+              language={meta.lang}
+              theme="vs-dark"
+              options={{
+                readOnly: true,
+                renderSideBySide: true,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                fontSize: 12,
+              }}
+            />
+          </Suspense>
+        </div>
+      ) : (
+        <pre className="max-w-full overflow-x-auto p-3 text-xs leading-relaxed">
+          <code className={cn("font-mono", className)}>{code}</code>
+        </pre>
+      )}
     </div>
   );
 }
