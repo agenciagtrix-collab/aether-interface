@@ -74,6 +74,33 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [tabs, setTabs] = useState<OpenTab[]>([]);
   const [activeTabPath, setActivePath] = useState<string | null>(null);
   const [edits, setEdits] = useState<FileEdit[]>([]);
+  const editsHydrated = useRef(false);
+
+  // Hidrata do IndexedDB no mount
+  useEffect(() => {
+    let cancelled = false;
+    idbGet<FileEdit[]>(EDITS_STORAGE_KEY)
+      .then((stored) => {
+        if (!cancelled && Array.isArray(stored) && stored.length) {
+          setEdits(stored);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        editsHydrated.current = true;
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persiste mudanças (após hidratação) — cap em EDITS_MAX mais recentes
+  useEffect(() => {
+    if (!editsHydrated.current) return;
+    const trimmed = edits.length > EDITS_MAX ? edits.slice(-EDITS_MAX) : edits;
+    idbSet(EDITS_STORAGE_KEY, trimmed).catch(() => {});
+  }, [edits]);
+
 
   const openNativeFolder = useCallback(async () => {
     if (!supportsNativeFs()) {
