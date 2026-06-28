@@ -590,6 +590,8 @@ export function SettingsView() {
             />
           </section>
 
+          <UncensoredModelSection />
+          <CustomSystemPromptSection />
           <AutoApplySection />
 
           <div className="flex items-center justify-between gap-3">
