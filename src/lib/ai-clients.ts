@@ -56,6 +56,19 @@ function authHeaders(provider: "openrouter" | "groq", apiKey: string) {
 }
 
 /** Chat completion não-stream (resposta completa). */
+function friendlyError(provider: string, status: number, body: string, statusText: string, model: string): string {
+  if (status === 429) {
+    const isFree = model.includes(":free");
+    return `⏱️ Limite de taxa atingido (429) no modelo "${model}".${
+      isFree ? " Modelos :free do OpenRouter compartilham fila pública e caem em rate-limit com frequência." : ""
+    }\n\nSoluções:\n• Abra Configurações e escolha outro modelo (ex: deepseek/deepseek-chat-v3.1:free, meta-llama/llama-3.3-70b-instruct:free)\n• Aguarde ~30s e tente de novo\n• Adicione crédito em openrouter.ai/settings/credits para sair da fila pública`;
+  }
+  if (status === 401) return `🔑 Chave inválida (401). Cheque sua chave em Configurações.`;
+  if (status === 402) return `💳 Créditos insuficientes (402). Adicione crédito no provedor ou troque para um modelo :free.`;
+  if (status === 404) return `❓ Modelo "${model}" não encontrado (404). Selecione outro em Configurações.`;
+  return `${provider} ${status}: ${body || statusText}`;
+}
+
 export async function callChatCompletion(
   messages: ChatMessage[],
   opts: { signal?: AbortSignal; temperature?: number } = {},
