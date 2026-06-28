@@ -34,6 +34,73 @@ function classifyModel(id: string, label: string): { isUncensored: boolean; mayR
   };
 }
 
+interface QuickPreset {
+  id: string;
+  icon: typeof Bot;
+  label: string;
+  tooltip: string;
+  primaryId: string;
+  highlightIds: string[];
+  filterQuery: string;
+  accent: string;
+}
+
+const QUICK_PRESETS: QuickPreset[] = [
+  {
+    id: "advanced",
+    icon: Bot,
+    label: "🤖 Uso Geral Avançado (Hermes 405B)",
+    tooltip: "Ideal para o Modo Agente, tarefas ultra complexas, lógica avançada e programação de códigos pesados.",
+    primaryId: "nousresearch/hermes-3-llama-3.1-405b",
+    highlightIds: ["nousresearch/hermes-3-llama-3.1-405b"],
+    filterQuery: "hermes",
+    accent: "from-sky-500/20 to-indigo-500/20 border-sky-500/40 text-sky-300",
+  },
+  {
+    id: "uncensored",
+    icon: Unlock,
+    label: "🔓 Liberdade Total Sem Censura (Venice/Magnum)",
+    tooltip: "Ideal para qualquer pergunta sem filtros éticos ou morais, escrita criativa sem travas.",
+    primaryId: "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+    highlightIds: [
+      "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+      "anthracite-org/magnum-v4-72b",
+    ],
+    filterQuery: "venice",
+    accent: "from-orange-500/20 to-rose-500/20 border-orange-500/40 text-orange-300",
+  },
+  {
+    id: "fast",
+    icon: Rocket,
+    label: "⚡ Respostas Ultra Rápidas (Modelos menores 8B/13B)",
+    tooltip: "Perfeito para conversas rápidas do dia a dia, gastando o mínimo possível de processamento e créditos.",
+    primaryId: "gryphe/mythomax-l2-13b",
+    highlightIds: ["gryphe/mythomax-l2-13b"],
+    filterQuery: "mythomax",
+    accent: "from-emerald-500/20 to-teal-500/20 border-emerald-500/40 text-emerald-300",
+  },
+];
+
+// Descrições dinâmicas exibidas abaixo do modelo selecionado
+const MODEL_DESCRIPTIONS: { match: RegExp; text: string }[] = [
+  { match: /hermes-3-llama-3\.1-405b/i, text: "Recomendado para o Modo Agente, raciocínio profundo, programação complexa e tarefas que exigem 405B de parâmetros." },
+  { match: /hermes/i, text: "Família Hermes/Nous: ótimo equilíbrio entre seguir instruções e responder sem travas excessivas." },
+  { match: /venice|dolphin/i, text: "Recomendado para conversas totalmente livres, sem filtros morais/éticos, e escrita criativa sem censura." },
+  { match: /magnum/i, text: "Magnum v4 72B: especialista em roleplay imersivo, prosa criativa e diálogo natural sem censura." },
+  { match: /mythomax/i, text: "Recomendado para RPG, conversas longas e histórias sem censura. Leve, rápido e barato." },
+  { match: /deepseek-r1|qwq/i, text: "Modelo com raciocínio nativo — você verá o passo a passo do pensamento antes da resposta final." },
+  { match: /deepseek/i, text: "DeepSeek: excelente em código, matemática e raciocínio lógico. Custo-benefício alto." },
+  { match: /gpt-4o|claude|gemini/i, text: "Modelo premium multimodal — suporta visão (imagens) e tem alta capacidade geral." },
+  { match: /llama-3\.1-8b|llama-3-8b|8b/i, text: "Modelo leve 8B: respostas rápidas, ideal para chat do dia a dia com baixo consumo." },
+  { match: /:free/i, text: "Modelo gratuito — pode ter limites de rate. Em caso de erro 429, tente outro :free." },
+];
+
+function describeModel(id: string): string | null {
+  if (!id) return null;
+  const hit = MODEL_DESCRIPTIONS.find((d) => d.match.test(id));
+  return hit?.text ?? null;
+}
+
 
 
 async function fetchModels(provider: AIProvider, apiKey: string): Promise<ModelOption[]> {
