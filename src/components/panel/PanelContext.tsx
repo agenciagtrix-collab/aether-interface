@@ -20,6 +20,7 @@ export interface AttachedFile {
   kind: "text" | "archive" | "image" | "binary" | "error";
   summary: string;
   content?: string;
+  dataUrl?: string;
   error?: string;
 }
 
