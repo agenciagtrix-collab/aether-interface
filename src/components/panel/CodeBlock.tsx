@@ -91,11 +91,64 @@ export function CodeBlock({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, meta.path, adapter, supportsWrite, applied]);
 
+  const doCreateAtPrompt = async () => {
+    if (!adapter) {
+      toast.error("Abra uma pasta de trabalho na IDE primeiro.");
+      return;
+    }
+    if (!supportsWrite) {
+      toast.error("Use Chrome/Edge com pasta aberta nativamente para gravar arquivos.");
+      return;
+    }
+    const guessExt =
+      meta.lang && meta.lang !== "plaintext"
+        ? `.${meta.lang.replace(/[^a-z0-9]/gi, "") || "txt"}`
+        : ".txt";
+    const suggested = `novo-arquivo${guessExt}`;
+    const path = window.prompt("Caminho do arquivo a criar (relativo à raiz do workspace):", suggested);
+    if (!path) return;
+    setBusy(true);
+    const result = await applyEdit(path.trim(), code);
+    setBusy(false);
+    if (result) setApplied(true);
+  };
+
   if (!meta.path) {
     return (
-      <code className={cn("rounded bg-background/60 px-1 py-0.5 font-mono text-[0.86em]", className)}>
-        {children}
-      </code>
+      <div className="my-3 overflow-hidden rounded-lg border border-border bg-background/70">
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-surface-2 px-3 py-1.5 text-[11px]">
+          <span className="flex min-w-0 items-center gap-1.5 font-mono text-muted-foreground">
+            <FileCode2 className="h-3 w-3 shrink-0 text-primary" />
+            <span className="rounded bg-background/60 px-1 py-px text-[9px] uppercase tracking-wider">
+              {meta.lang}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={doCreateAtPrompt}
+            disabled={busy || applied}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-medium transition-colors",
+              applied
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                : "border-primary/50 bg-primary/15 text-primary hover:bg-primary/25",
+              (busy || applied) && "cursor-not-allowed opacity-80",
+            )}
+          >
+            {busy ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : applied ? (
+              <Check className="h-3 w-3" />
+            ) : (
+              <Plus className="h-3 w-3" />
+            )}
+            {applied ? "Aplicado" : busy ? "Criando..." : "Aplicar ao Workspace"}
+          </button>
+        </div>
+        <pre className="max-w-full overflow-x-auto p-3 text-xs leading-relaxed">
+          <code className={cn("font-mono", className)}>{code}</code>
+        </pre>
+      </div>
     );
   }
 
