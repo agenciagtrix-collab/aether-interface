@@ -7,8 +7,10 @@ import { buildAttachmentContext } from "@/lib/file-readers";
 import {
   callChatCompletion,
   streamChatCompletion,
+  textFromContent,
   webSearch,
   type ChatMessage,
+  type OpenAIContentPart,
 } from "@/lib/ai-clients";
 
 const uid = () => crypto.randomUUID();
@@ -24,6 +26,24 @@ function splitThinking(raw: string): { thinking: string; answer: string } {
   return { thinking: thinks.join("\n\n"), answer: answer || raw.trim() };
 }
 
+function buildUserContent(text: string, attachments: AttachedFile[]): ChatMessage["content"] {
+  const attachmentContext = buildAttachmentContext(attachments);
+  const contentText = attachmentContext
+    ? `${text}\n\n[Contexto real dos arquivos anexados]\n${attachmentContext}`
+    : text;
+  const images = attachments.filter((file) => file.kind === "image" && file.dataUrl);
+
+  if (images.length === 0) return contentText;
+
+  return [
+    { type: "text", text: contentText },
+    ...images.map<OpenAIContentPart>((file) => ({
+      type: "image_url",
+      image_url: { url: file.dataUrl! },
+    })),
+  ];
+}
+
 export function ChatView() {
   const panel = usePanel();
 
@@ -31,12 +51,9 @@ export function ChatView() {
     const history: ChatMessage[] = panel.messages
       .filter((m) => (m.role === "user" || m.role === "assistant") && m.content.trim().length > 0)
       .map((m) => {
-        const attachmentContext = m.role === "user" ? buildAttachmentContext(m.attachments ?? []) : "";
         return {
           role: m.role as "user" | "assistant",
-          content: attachmentContext
-            ? `${m.content}\n\n[Contexto real dos arquivos anexados]\n${attachmentContext}`
-            : m.content,
+          content: m.role === "user" ? buildUserContent(m.content, m.attachments ?? []) : m.content,
         };
       });
     return [...history, ...extra];
@@ -61,12 +78,9 @@ export function ChatView() {
     panel.setStatusText("Pensando");
     const asstId = panel.addMessage({ role: "assistant", mode: "chat", content: "", streaming: true });
 
-    const attachmentContext = buildAttachmentContext(attachments);
     const userTurn: ChatMessage = {
       role: "user",
-      content: attachmentContext
-        ? `${text}\n\n[Contexto real dos arquivos anexados]\n${attachmentContext}`
-        : text,
+      content: buildUserContent(text, attachments),
     };
 
     let buffer = "";
@@ -147,7 +161,7 @@ export function ChatView() {
           content:
             "Você é um agente autônomo. Responda APENAS com uma lista numerada curta (3 a 6 passos) descrevendo como executar a missão. Sem preâmbulo.",
         },
-        { role: "user", content: attachmentContext ? `${text}\n\n[Arquivos anexados]\n${attachmentContext}` : text },
+        { role: "user", content: buildUserContent(text, attachments) },
       ]);
       updateStep(planStep, { status: "done", detail: plan });
 
@@ -231,7 +245,7 @@ export function ChatView() {
           ...buildHistory(),
           {
             role: "user",
-            content: `Missão: ${text}${attachmentContext ? `\n\n[Arquivos anexados]\n${attachmentContext}` : ""}\n\nPlano:\n${plan}\n\nExecute agora.`,
+            content: buildUserContent(`Missão: ${text}\n\nPlano:\n${plan}\n\nExecute agora.`, attachments),
           },
         ],
         { onDelta: flush, temperature: 0.7 },
