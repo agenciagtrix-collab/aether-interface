@@ -56,6 +56,19 @@ export function ChatView() {
   const [codeCtx, setCodeCtx] = useState("");
   const handleCodeCtx = useCallback((s: string) => setCodeCtx(s), []);
 
+  const [activeAgent, setActiveAgent] = useState<AgentId>(() => {
+    if (typeof window === "undefined") return "orquestrador";
+    const saved = localStorage.getItem(ACTIVE_AGENT_KEY) as AgentId | null;
+    return saved && saved in AGENTS ? saved : "orquestrador";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") localStorage.setItem(ACTIVE_AGENT_KEY, activeAgent);
+  }, [activeAgent]);
+
+  const [refusalOpen, setRefusalOpen] = useState(false);
+  const lastAssistantIdRef = useRef<string | null>(null);
+
+
   const buildHistory = (extra: ChatMessage[] = []): ChatMessage[] => {
     const history: ChatMessage[] = panel.messages
       .filter((m) => (m.role === "user" || m.role === "assistant") && m.content.trim().length > 0)
