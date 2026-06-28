@@ -3,6 +3,7 @@ import { Bot, User, Sparkles, Paperclip, Brain, ChevronDown } from "lucide-react
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { usePanel } from "./PanelContext";
+import { CodeBlock } from "./CodeBlock";
 import { cn } from "@/lib/utils";
 
 function TypingDots() {
@@ -48,16 +49,16 @@ function MarkdownMessage({ content, streaming }: { content: string; streaming?: 
           ul: ({ children }) => <ul className="ml-5 list-disc space-y-1">{children}</ul>,
           ol: ({ children }) => <ol className="ml-5 list-decimal space-y-1">{children}</ol>,
           li: ({ children }) => <li className="pl-1">{children}</li>,
-          pre: ({ children }) => (
-            <pre className="my-3 max-w-full overflow-x-auto rounded-lg border border-border bg-background/70 p-3 text-xs leading-relaxed">
-              {children}
-            </pre>
-          ),
-          code: ({ children, className }) => (
-            <code className={cn("rounded bg-background/60 px-1 py-0.5 font-mono text-[0.86em]", className)}>
-              {children}
-            </code>
-          ),
+          pre: ({ children }) => <>{children}</>,
+          code: ({ children, className }) => {
+            const isBlock = /language-/.test(className ?? "");
+            if (isBlock) return <CodeBlock className={className}>{children}</CodeBlock>;
+            return (
+              <code className={cn("rounded bg-background/60 px-1 py-0.5 font-mono text-[0.86em]", className)}>
+                {children}
+              </code>
+            );
+          },
           a: ({ children, href }) => (
             <a href={href} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
               {children}
