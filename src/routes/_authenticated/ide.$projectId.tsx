@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { IdeShell } from "@/components/ide/IdeShell";
 import { PanelProvider } from "@/components/panel/PanelContext";
 import { CloudWorkspaceMounter } from "@/components/ide/CloudWorkspaceMounter";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/ide/$projectId")({
   head: () => ({
@@ -51,21 +51,19 @@ function IdePage() {
 
   return (
     <PanelProvider>
-      <IdeShell topBar={<TopBar projectName={projectId === "local" ? "Pasta local" : meta?.name ?? ""} />}>
+      <IdeShell>
         {projectId !== "local" && meta && (
           <CloudWorkspaceMounter userId={meta.userId} projectId={projectId} name={meta.name} />
         )}
+        <Link
+          to="/"
+          className="fixed left-14 top-2 z-50 inline-flex items-center gap-1 rounded-md border border-border bg-surface-1/90 px-2 py-1 text-xs text-muted-foreground backdrop-blur hover:text-foreground"
+          title="Voltar para projetos"
+        >
+          <ArrowLeft className="h-3 w-3" />
+          {projectId === "local" ? "Local" : meta?.name ?? "Projeto"}
+        </Link>
       </IdeShell>
     </PanelProvider>
-  );
-}
-
-function TopBar({ projectName }: { projectName: string }) {
-  return (
-    <div className="flex h-9 shrink-0 items-center gap-3 border-b border-border bg-surface-1 px-3 text-xs">
-      <Link to="/" className="text-muted-foreground hover:text-foreground">← Projetos</Link>
-      <span className="text-muted-foreground">/</span>
-      <span className="font-medium">{projectName}</span>
-    </div>
   );
 }
