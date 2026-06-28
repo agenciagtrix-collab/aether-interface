@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bot,
   Files,
@@ -7,6 +7,13 @@ import {
   History,
   MessageSquare,
   Database,
+  PanelRightClose,
+  PanelRightOpen,
+  PanelBottomClose,
+  PanelBottomOpen,
+  PanelLeftClose,
+  PanelLeftOpen,
+  RotateCcw,
   Settings as SettingsIcon,
 } from "lucide-react";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
@@ -20,14 +27,17 @@ import { TaskHistory } from "@/components/panel/views/TaskHistory";
 import { MemoryBank } from "@/components/panel/views/MemoryBank";
 import { SettingsView } from "@/components/panel/views/Settings";
 import { usePanel } from "@/components/panel/PanelContext";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { loadIdeUiState, saveIdeUiState, resetIdeLayout, type IdeUiState } from "@/lib/workspace/layout-storage";
 
 type ActivityView = "explorer" | "chat" | "agents" | "history" | "memory" | "settings";
 
 function ResizeHandle({ orientation }: { orientation: "horizontal" | "vertical" }) {
   const isHorizontal = orientation === "horizontal";
   const Icon = isHorizontal ? GripVertical : GripHorizontal;
-
   return (
     <PanelResizeHandle
       aria-label={isHorizontal ? "Redimensionar colunas" : "Redimensionar linhas"}
@@ -62,12 +72,20 @@ const ACTIVITY_ITEMS: { id: ActivityView; label: string; icon: typeof Files }[] 
 function ActivityBar({
   active,
   onSelect,
+  orientation = "vertical",
 }: {
   active: ActivityView;
   onSelect: (v: ActivityView) => void;
+  orientation?: "vertical" | "horizontal";
 }) {
+  const isVertical = orientation === "vertical";
   return (
-    <nav className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-border bg-surface-1 py-2">
+    <nav
+      className={cn(
+        "flex shrink-0 items-center gap-1 border-border bg-surface-1",
+        isVertical ? "w-12 flex-col border-r py-2" : "h-12 w-full flex-row justify-around border-t px-2",
+      )}
+    >
       {ACTIVITY_ITEMS.map(({ id, label, icon: Icon }) => {
         const isActive = active === id;
         return (
@@ -81,7 +99,12 @@ function ActivityBar({
             )}
           >
             {isActive && (
-              <span className="absolute left-0 top-1/2 h-6 w-0.5 -translate-y-1/2 rounded-r bg-primary" />
+              <span
+                className={cn(
+                  "absolute rounded bg-primary",
+                  isVertical ? "left-0 top-1/2 h-6 w-0.5 -translate-y-1/2" : "bottom-0 left-1/2 h-0.5 w-6 -translate-x-1/2",
+                )}
+              />
             )}
             <Icon className="h-5 w-5" />
           </button>
@@ -97,89 +120,218 @@ function SidebarPanel({ view }: { view: ActivityView }) {
   if (view === "history") return <TaskHistory />;
   if (view === "memory") return <MemoryBank />;
   if (view === "settings") return <SettingsView />;
-  // chat tem coluna própria à direita
   return (
-    <div className="p-4 text-xs text-muted-foreground">
-      Use o painel de chat à direita.
+    <div className="p-4 text-xs text-muted-foreground">Use o painel de chat à direita.</div>
+  );
+}
+
+function StatusBar({
+  ui,
+  setUi,
+  effectiveShowTerminal,
+}: {
+  ui: IdeUiState;
+  setUi: (patch: Partial<IdeUiState>) => void;
+  effectiveShowTerminal: boolean;
+}) {
+  const { rootName, tabs, activeTabPath, supportsWrite } = useWorkspace();
+  const active = tabs.find((t) => t.path === activeTabPath);
+  return (
+    <div className="flex h-7 shrink-0 items-center justify-between gap-2 border-t border-border bg-primary/10 px-3 font-mono text-[10px] text-muted-foreground">
+      <div className="flex min-w-0 items-center gap-3 truncate">
+        <span className="truncate">{rootName ?? "sem workspace"}</span>
+        {active && <span className="hidden sm:inline">{active.language}</span>}
+        {active?.dirty && <span className="text-primary">● não salvo</span>}
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <span className="hidden md:inline">{supportsWrite ? "FS: leitura/escrita" : "somente leitura"}</span>
+        <button
+          title="Alternar barra lateral (Ctrl+B)"
+          onClick={() => setUi({ showSidebar: !ui.showSidebar })}
+          className="rounded p-1 hover:bg-primary/15 hover:text-primary"
+        >
+          {ui.showSidebar ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeftOpen className="h-3.5 w-3.5" />}
+        </button>
+        <button
+          title="Alternar terminal (Ctrl+J)"
+          onClick={() => setUi({ showTerminal: !effectiveShowTerminal })}
+          className="rounded p-1 hover:bg-primary/15 hover:text-primary"
+        >
+          {effectiveShowTerminal ? <PanelBottomClose className="h-3.5 w-3.5" /> : <PanelBottomOpen className="h-3.5 w-3.5" />}
+        </button>
+        <button
+          title="Alternar chat (Ctrl+Alt+C)"
+          onClick={() => setUi({ showChat: !ui.showChat })}
+          className="rounded p-1 hover:bg-primary/15 hover:text-primary"
+        >
+          {ui.showChat ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
+        </button>
+        <button
+          title="Resetar layout"
+          onClick={() => {
+            resetIdeLayout();
+            window.location.reload();
+          }}
+          className="rounded p-1 hover:bg-primary/15 hover:text-primary"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   );
 }
 
-function StatusBar() {
-  const { rootName, tabs, activeTabPath, supportsWrite } = useWorkspace();
-  const active = tabs.find((t) => t.path === activeTabPath);
+function MobileShell({
+  ui,
+  setUi,
+  showTerminal,
+}: {
+  ui: IdeUiState;
+  setUi: (patch: Partial<IdeUiState>) => void;
+  showTerminal: boolean;
+}) {
+  const [tab, setTab] = useState<"explorer" | "editor" | "chat">("editor");
   return (
-    <div className="flex h-6 shrink-0 items-center justify-between border-t border-border bg-primary/10 px-3 font-mono text-[10px] text-muted-foreground">
-      <div className="flex items-center gap-3">
-        <span>{rootName ?? "sem workspace"}</span>
-        {active && <span>{active.language}</span>}
-        {active?.dirty && <span className="text-primary">● não salvo</span>}
-      </div>
-      <div className="flex items-center gap-3">
-        <span>{supportsWrite ? "FS: leitura/escrita" : "FS: somente leitura"}</span>
-        <span>UTF-8</span>
-      </div>
-    </div>
+    <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="flex h-full min-h-0 w-full flex-col">
+      <TabsList className="m-2 grid w-[calc(100%-1rem)] shrink-0 grid-cols-3">
+        <TabsTrigger value="explorer">Arquivos</TabsTrigger>
+        <TabsTrigger value="editor">Editor</TabsTrigger>
+        <TabsTrigger value="chat">Chat</TabsTrigger>
+      </TabsList>
+      <TabsContent value="explorer" className="min-h-0 flex-1 overflow-hidden bg-surface-1">
+        <FileExplorer />
+      </TabsContent>
+      <TabsContent value="editor" className="min-h-0 flex-1 overflow-hidden">
+        <EditorArea />
+      </TabsContent>
+      <TabsContent value="chat" className="min-h-0 flex-1 overflow-hidden bg-surface-1">
+        <ChatView />
+      </TabsContent>
+      <Sheet open={showTerminal} onOpenChange={(open) => setUi({ showTerminal: open })}>
+        <SheetContent side="bottom" className="h-[60vh] p-0">
+          <SheetHeader className="border-b border-border p-3">
+            <SheetTitle className="text-xs">Pensamento do Agente</SheetTitle>
+          </SheetHeader>
+          <div className="h-[calc(60vh-3rem)] overflow-hidden">
+            <ThinkingTerminal />
+          </div>
+        </SheetContent>
+      </Sheet>
+    </Tabs>
   );
 }
 
 function IdeShellInner() {
-  const [view, setView] = useState<ActivityView>("explorer");
   const { mode } = usePanel();
-  const showTerminal = mode === "agent";
+  const isMobile = useIsMobile();
+  const [ui, setUiState] = useState<IdeUiState>(() => loadIdeUiState());
+
+  const setUi = (patch: Partial<IdeUiState>) => {
+    setUiState((prev) => {
+      const next = { ...prev, ...patch };
+      saveIdeUiState(next);
+      return next;
+    });
+  };
+
+  // Override manual; null = segue o modo agente
+  const effectiveShowTerminal = ui.showTerminal == null ? mode === "agent" : ui.showTerminal;
+
+  // Atalhos de teclado
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const k = e.key.toLowerCase();
+      if (k === "b" && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        setUi({ showSidebar: !ui.showSidebar });
+      } else if (k === "j" && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        setUi({ showTerminal: !effectiveShowTerminal });
+      } else if (k === "c" && e.altKey) {
+        e.preventDefault();
+        setUi({ showChat: !ui.showChat });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [ui.showSidebar, ui.showChat, effectiveShowTerminal]);
+
+  if (isMobile) {
+    return (
+      <main className="fixed inset-0 flex h-[100dvh] w-screen flex-col overflow-hidden bg-background text-foreground">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <MobileShell ui={ui} setUi={setUi} showTerminal={effectiveShowTerminal} />
+        </div>
+        <ActivityBar
+          active={ui.activityView as ActivityView}
+          onSelect={(v) => setUi({ activityView: v })}
+          orientation="horizontal"
+        />
+        <StatusBar ui={ui} setUi={setUi} effectiveShowTerminal={effectiveShowTerminal} />
+      </main>
+    );
+  }
 
   return (
     <main className="fixed inset-0 flex h-[100dvh] w-screen flex-col overflow-hidden bg-background text-foreground">
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <ActivityBar active={view} onSelect={setView} />
+        <ActivityBar
+          active={ui.activityView as ActivityView}
+          onSelect={(v) => setUi({ activityView: v })}
+        />
 
         <PanelGroup
           id="ide-root-layout"
           orientation="horizontal"
+          autoSave="ide-root-layout-v1"
           resizeTargetMinimumSize={{ coarse: 28, fine: 10 }}
           className="h-full min-h-0 min-w-0 flex-1"
         >
-          {/* Sidebar */}
-          <Panel
-            id="ide-sidebar"
-            defaultSize="18%"
-            minSize="220px"
-            maxSize="420px"
-            className="bg-surface-1"
-            style={{ overflow: "hidden" }}
-          >
-            <div className="flex h-full w-full min-w-0 overflow-hidden">
-              <SidebarPanel view={view} />
-            </div>
-          </Panel>
-          <ResizeHandle orientation="horizontal" />
+          {ui.showSidebar && (
+            <>
+              <Panel
+                id="ide-sidebar"
+                defaultSize="18%"
+                minSize="200px"
+                maxSize="420px"
+                className="bg-surface-1"
+                style={{ overflow: "hidden" }}
+              >
+                <div className="flex h-full w-full min-w-0 overflow-hidden">
+                  <SidebarPanel view={ui.activityView as ActivityView} />
+                </div>
+              </Panel>
+              <ResizeHandle orientation="horizontal" />
+            </>
+          )}
 
-          {/* Editor + bottom terminal */}
-          <Panel id="ide-editor-stack" defaultSize="52%" minSize="360px" style={{ overflow: "hidden" }}>
             <PanelGroup
               id="ide-editor-layout"
               orientation="vertical"
+              autoSave="ide-editor-layout-v1"
               resizeTargetMinimumSize={{ coarse: 28, fine: 10 }}
               className="h-full min-h-0 w-full min-w-0"
             >
               <Panel
                 id="ide-editor"
-                defaultSize={showTerminal ? "70%" : "100%"}
-                minSize="220px"
+                defaultSize={effectiveShowTerminal ? "70%" : "100%"}
+                minSize="200px"
                 style={{ overflow: "hidden" }}
               >
                 <div className="h-full w-full min-w-0 overflow-hidden">
                   <EditorArea />
                 </div>
               </Panel>
-              {showTerminal && (
+              {effectiveShowTerminal && (
                 <>
                   <ResizeHandle orientation="vertical" />
                   <Panel
                     id="ide-thinking-terminal"
                     defaultSize="30%"
-                    minSize="160px"
-                    maxSize="55%"
+                    minSize="140px"
+                    maxSize="60%"
                     className="bg-surface-1"
                     style={{ overflow: "hidden" }}
                   >
@@ -191,24 +343,27 @@ function IdeShellInner() {
               )}
             </PanelGroup>
           </Panel>
-          <ResizeHandle orientation="horizontal" />
 
-          {/* Chat panel */}
-          <Panel
-            id="ide-chat"
-            defaultSize="30%"
-            minSize="340px"
-            maxSize="560px"
-            className="bg-surface-1"
-            style={{ overflow: "hidden" }}
-          >
-            <div className="flex h-full w-full min-w-0 overflow-hidden">
-              <ChatView />
-            </div>
-          </Panel>
+          {ui.showChat && (
+            <>
+              <ResizeHandle orientation="horizontal" />
+              <Panel
+                id="ide-chat"
+                defaultSize="30%"
+                minSize="300px"
+                maxSize="560px"
+                className="bg-surface-1"
+                style={{ overflow: "hidden" }}
+              >
+                <div className="flex h-full w-full min-w-0 overflow-hidden">
+                  <ChatView />
+                </div>
+              </Panel>
+            </>
+          )}
         </PanelGroup>
       </div>
-      <StatusBar />
+      <StatusBar ui={ui} setUi={setUi} effectiveShowTerminal={effectiveShowTerminal} />
     </main>
   );
 }
