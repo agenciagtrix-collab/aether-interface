@@ -344,8 +344,9 @@ function IdeShellInner() {
                     style={{ overflow: "hidden" }}
                   >
                     <div className="h-full w-full min-w-0 overflow-hidden">
-                      <ThinkingTerminal />
+                      <BottomTerminalTabs />
                     </div>
+
                   </Panel>
                 </>
               )}
