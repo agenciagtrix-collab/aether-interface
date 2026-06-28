@@ -105,10 +105,15 @@ export function ChatView() {
   const runChat = async (
     text: string,
     attachments: AttachedFile[],
-    opts: { modelOverride?: string; extraSystem?: string } = {},
+    opts: { modelOverride?: string; extraSystem?: string; agentId?: AgentId } = {},
   ) => {
-    panel.setStatusText(opts.modelOverride ? "Reenviando para modelo uncensored" : "Pensando");
+    const agentId = opts.agentId ?? activeAgent;
+    const agent = AGENTS[agentId];
+    panel.setStatusText(
+      opts.modelOverride ? `Reenviando via ${agent.name}` : `${agent.emoji} ${agent.name} pensando`,
+    );
     const asstId = panel.addMessage({ role: "assistant", mode: "chat", content: "", streaming: true });
+    lastAssistantIdRef.current = asstId;
 
     const userTurn: ChatMessage = {
       role: "user",
@@ -150,10 +155,15 @@ export function ChatView() {
       panel.updateMessage(asstId, { content: answerText.trim(), thinking: thinkText.trim() });
     };
 
+    const agentSystem = `\n\n[Persona ativa: ${agent.name}]\n${agent.systemPrompt}`;
+
     try {
       await streamChatCompletion(
         [
-          { role: "system", content: getReasoningSystem() + codeCtx + (opts.extraSystem ?? "") },
+          {
+            role: "system",
+            content: getReasoningSystem() + codeCtx + agentSystem + (opts.extraSystem ?? ""),
+          },
           ...buildHistory(),
           userTurn,
         ],
@@ -167,6 +177,11 @@ export function ChatView() {
         thinking: finalParsed.thinking,
         streaming: false,
       });
+
+      // Se não for já uncensored e a resposta parecer uma recusa → abre modal.
+      if (!opts.modelOverride && agentId !== "uncensored" && isRefusal(finalParsed.answer)) {
+        setRefusalOpen(true);
+      }
     } catch (err: any) {
       panel.updateMessage(asstId, {
         content: `❌ Erro: ${err?.message ?? String(err)}`,
@@ -176,6 +191,7 @@ export function ChatView() {
       panel.setStatusText("");
     }
   };
+
 
   const resendWithUncensored = useCallback(
     async (assistantId: string) => {
