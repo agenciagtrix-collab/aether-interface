@@ -24,16 +24,17 @@ let cache: Settings | null = null;
 function read(): Settings {
   if (cache) return cache;
   if (typeof window === "undefined") {
-    cache = DEFAULT_SETTINGS;
-    return cache;
+    return DEFAULT_SETTINGS;
   }
+  let next: Settings = DEFAULT_SETTINGS;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    cache = raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : DEFAULT_SETTINGS;
+    if (raw) next = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
   } catch {
-    cache = DEFAULT_SETTINGS;
+    next = DEFAULT_SETTINGS;
   }
-  return cache;
+  cache = next;
+  return next;
 }
 
 function write(next: Settings) {
