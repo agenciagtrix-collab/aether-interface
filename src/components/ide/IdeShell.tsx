@@ -374,9 +374,11 @@ function IdeShellInner() {
   );
 }
 
-export function IdeShell() {
+export function IdeShell({ topBar, children }: { topBar?: React.ReactNode; children?: React.ReactNode } = {}) {
   return (
     <WorkspaceProvider>
+      {children}
+      {topBar}
       <IdeShellInner />
     </WorkspaceProvider>
   );
