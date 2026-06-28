@@ -1,4 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { get as idbGet, set as idbSet } from "idb-keyval";
+
+const EDITS_STORAGE_KEY = "jarvis_agent_edits_v1";
+const EDITS_MAX = 200;
 import { toast } from "sonner";
 import {
   MemoryFsAdapter,
