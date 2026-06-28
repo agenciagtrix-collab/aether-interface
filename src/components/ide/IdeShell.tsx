@@ -7,7 +7,7 @@ import {
   Database,
   Settings as SettingsIcon,
 } from "lucide-react";
-import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 import { FileExplorer } from "./FileExplorer";
 import { EditorArea } from "./EditorArea";
 import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";

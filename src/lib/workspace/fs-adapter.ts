@@ -91,7 +91,7 @@ export class NativeFsAdapter implements FsAdapter {
   async list(path: string): Promise<FsNode[]> {
     const dir = await this.resolveDir(path);
     const out: FsNode[] = [];
-    // @ts-expect-error — entries() existe em runtime
+    // entries() existe em runtime
     for await (const [name, entry] of dir.entries()) {
       if (EXCLUDED_NAMES.has(name)) continue;
       out.push({
@@ -121,7 +121,7 @@ export class NativeFsAdapter implements FsAdapter {
       dir = await dir.getDirectoryHandle(seg, { create: true });
     }
     const fh = await dir.getFileHandle(name, { create: true });
-    // @ts-expect-error — createWritable existe em runtime
+    // createWritable existe em runtime
     const writable = await fh.createWritable();
     await writable.write(content);
     await writable.close();
