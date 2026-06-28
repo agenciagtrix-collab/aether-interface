@@ -10,7 +10,19 @@
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | OpenAIContentPart[];
+}
+
+export type OpenAIContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
+export function textFromContent(content: ChatMessage["content"]): string {
+  if (typeof content === "string") return content;
+  return content
+    .filter((part): part is { type: "text"; text: string } => part.type === "text")
+    .map((part) => part.text)
+    .join("\n");
 }
 
 export interface SearchResult {
@@ -41,6 +53,22 @@ function endpoint(provider: "openrouter" | "groq") {
   return provider === "groq"
     ? "https://api.groq.com/openai/v1/chat/completions"
     : "https://openrouter.ai/api/v1/chat/completions";
+}
+
+function normalizeMessagesForProvider(provider: "openrouter" | "groq", messages: ChatMessage[]): ChatMessage[] {
+  if (provider !== "groq") return messages;
+
+  return messages.map((message) => {
+    if (typeof message.content === "string") return message;
+    const text = textFromContent(message.content);
+    const imageCount = message.content.filter((part) => part.type === "image_url").length;
+    return {
+      ...message,
+      content: imageCount
+        ? `${text}\n\n[${imageCount} imagem(ns) anexada(s). Observação: imagens são enviadas visualmente apenas por provedores/modelos compatíveis com visão; no Groq este painel envia o texto/metadados.]`
+        : text,
+    };
+  });
 }
 
 function authHeaders(provider: "openrouter" | "groq", apiKey: string) {
@@ -83,7 +111,7 @@ export async function callChatCompletion(
     headers: authHeaders(provider, apiKey),
     body: JSON.stringify({
       model,
-      messages,
+      messages: normalizeMessagesForProvider(provider, messages),
       temperature: opts.temperature ?? 0.7,
       stream: false,
     }),
@@ -118,7 +146,7 @@ export async function streamChatCompletion(
     headers: authHeaders(provider, apiKey),
     body: JSON.stringify({
       model,
-      messages,
+      messages: normalizeMessagesForProvider(provider, messages),
       temperature: opts.temperature ?? 0.7,
       stream: true,
     }),
