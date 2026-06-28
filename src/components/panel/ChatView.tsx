@@ -71,15 +71,24 @@ export function ChatView() {
     panel.setTerminalSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   };
 
-  const REASONING_SYSTEM =
+  const REASONING_SYSTEM_BASE =
     "Você é um pair-programmer dentro de uma IDE (estilo VSCode) com acesso ao código do usuário. " +
     "Antes de responder, pense passo a passo dentro de um bloco <think>...</think> explicando seu raciocínio. " +
     "Depois, FORA do bloco, escreva a resposta final clara e em português. " +
     "Quando mostrar código, use Markdown com fences triplas indicando linguagem e, quando estiver alterando um arquivo do projeto, " +
     "use o formato ```lang:caminho/do/arquivo.tsx para o usuário poder aplicar a mudança.";
 
-  const runChat = async (text: string, attachments: AttachedFile[]) => {
-    panel.setStatusText("Pensando");
+  const getReasoningSystem = () => {
+    const custom = typeof window !== "undefined" ? (localStorage.getItem("jarvis_system_prompt") ?? "").trim() : "";
+    return custom ? `${custom}\n\n---\n${REASONING_SYSTEM_BASE}` : REASONING_SYSTEM_BASE;
+  };
+
+  const runChat = async (
+    text: string,
+    attachments: AttachedFile[],
+    opts: { modelOverride?: string; extraSystem?: string } = {},
+  ) => {
+    panel.setStatusText(opts.modelOverride ? "Reenviando para modelo uncensored" : "Pensando");
     const asstId = panel.addMessage({ role: "assistant", mode: "chat", content: "", streaming: true });
 
     const userTurn: ChatMessage = {
@@ -94,7 +103,6 @@ export function ChatView() {
 
     const flush = (chunk: string) => {
       buffer += chunk;
-      // processa tags <think> incrementalmente
       while (true) {
         if (!inThink) {
           const open = buffer.indexOf("<think>");
@@ -126,14 +134,13 @@ export function ChatView() {
     try {
       await streamChatCompletion(
         [
-          { role: "system", content: REASONING_SYSTEM + codeCtx },
+          { role: "system", content: getReasoningSystem() + codeCtx + (opts.extraSystem ?? "") },
           ...buildHistory(),
           userTurn,
         ],
-        { onDelta: flush, temperature: 0.7 },
+        { onDelta: flush, temperature: 0.7, modelOverride: opts.modelOverride },
       );
 
-      // fallback: se não houve <think>, trata buffer como resposta
       if (buffer) answerText += buffer;
       const finalParsed = splitThinking((thinkText ? `<think>${thinkText}</think>` : "") + answerText);
       panel.updateMessage(asstId, {
@@ -150,6 +157,37 @@ export function ChatView() {
       panel.setStatusText("");
     }
   };
+
+  const resendWithUncensored = useCallback(
+    async (assistantId: string) => {
+      if (panel.isRunning) return;
+      const idx = panel.messages.findIndex((m) => m.id === assistantId);
+      if (idx < 0) return;
+      // localiza a última mensagem do usuário antes deste assistant
+      let userMsg: typeof panel.messages[number] | undefined;
+      for (let i = idx - 1; i >= 0; i--) {
+        if (panel.messages[i].role === "user") {
+          userMsg = panel.messages[i];
+          break;
+        }
+      }
+      if (!userMsg) return;
+      const uncensoredModel =
+        (typeof window !== "undefined" && localStorage.getItem("jarvis_uncensored_model")) ||
+        "cognitivecomputations/dolphin-mistral-24b-venice-edition:free";
+      panel.setRunning(true);
+      try {
+        await runChat(userMsg.content, userMsg.attachments ?? [], {
+          modelOverride: uncensoredModel,
+          extraSystem: "\n\n[Reenvio em motor alternativo escolhido pelo usuário]",
+        });
+      } finally {
+        panel.setRunning(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [panel.messages, panel.isRunning, codeCtx],
+  );
 
   const runAgent = async (text: string, attachments: AttachedFile[]) => {
     panel.clearTerminal();
@@ -207,7 +245,7 @@ export function ChatView() {
       const asstId = panel.addMessage({ role: "assistant", mode: "agent", content: "", streaming: true });
 
       const systemPrompt =
-        REASONING_SYSTEM +
+        getReasoningSystem() +
         codeCtx +
         "\n\nVocê é um agente autônomo executando a missão do usuário seguindo o plano abaixo." +
         (searchContext
@@ -314,7 +352,7 @@ export function ChatView() {
       </header>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        <MessageList />
+        <MessageList onResendUncensored={resendWithUncensored} />
       </div>
 
       <CodeContextBar onContextChange={handleCodeCtx} />

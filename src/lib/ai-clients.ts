@@ -102,9 +102,10 @@ function friendlyError(provider: string, status: number, body: string, statusTex
 
 export async function callChatCompletion(
   messages: ChatMessage[],
-  opts: { signal?: AbortSignal; temperature?: number } = {},
+  opts: { signal?: AbortSignal; temperature?: number; modelOverride?: string } = {},
 ): Promise<string> {
-  const { provider, apiKey, model } = getCredentials();
+  const { provider, apiKey, model: defaultModel } = getCredentials();
+  const model = opts.modelOverride?.trim() || defaultModel;
   if (!apiKey) throw new Error("Nenhuma chave de API. Abra Configurações e salve sua chave.");
   if (!model) throw new Error("Nenhum modelo definido em Configurações.");
 
@@ -137,9 +138,11 @@ export async function streamChatCompletion(
     signal?: AbortSignal;
     temperature?: number;
     onDelta: (chunk: string) => void;
+    modelOverride?: string;
   },
 ): Promise<string> {
-  const { provider, apiKey, model } = getCredentials();
+  const { provider, apiKey, model: defaultModel } = getCredentials();
+  const model = opts.modelOverride?.trim() || defaultModel;
   if (!apiKey) throw new Error("Nenhuma chave de API. Abra Configurações e salve sua chave.");
   if (!model) throw new Error("Nenhum modelo definido em Configurações.");
 

@@ -590,6 +590,8 @@ export function SettingsView() {
             />
           </section>
 
+          <UncensoredModelSection />
+          <CustomSystemPromptSection />
           <AutoApplySection />
 
           <div className="flex items-center justify-between gap-3">
@@ -639,6 +641,95 @@ function AutoApplySection() {
         <input type="checkbox" checked={enabled} onChange={toggle} className="h-4 w-4 accent-primary" />
         <span className="text-xs">Ativar auto-aplicar com confirmação</span>
       </label>
+    </section>
+  );
+}
+
+function UncensoredModelSection() {
+  const [value, setValue] = useState(
+    () =>
+      (typeof window !== "undefined" && localStorage.getItem("jarvis_uncensored_model")) ||
+      "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+  );
+  const save = () => {
+    localStorage.setItem("jarvis_uncensored_model", value.trim());
+    toast.success("Modelo uncensored salvo.");
+  };
+  return (
+    <section className="rounded-xl border border-border bg-surface-1 p-5">
+      <div className="mb-1 flex items-center gap-2">
+        <Unlock className="h-4 w-4 text-orange-400" />
+        <h2 className="text-sm font-semibold">Modelo Uncensored (botão de reenvio)</h2>
+      </div>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Usado pelo botão <span className="font-mono text-orange-300">"Reenviar para Modelo Uncensored"</span> que
+        aparece embaixo de cada resposta do chat. Você escolhe e controla qual modelo é acionado.
+      </p>
+      <div className="flex gap-2">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="ex: cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
+          className="flex-1 rounded-md border border-border bg-surface-2 px-3 py-2 font-mono text-xs outline-none focus:border-primary/60"
+        />
+        <button
+          onClick={save}
+          className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90"
+        >
+          <Save className="h-3.5 w-3.5" />
+          Salvar
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function CustomSystemPromptSection() {
+  const [value, setValue] = useState(
+    () => (typeof window !== "undefined" && localStorage.getItem("jarvis_system_prompt")) || "",
+  );
+  const save = () => {
+    localStorage.setItem("jarvis_system_prompt", value);
+    toast.success("System prompt customizado salvo.");
+  };
+  const clear = () => {
+    setValue("");
+    localStorage.removeItem("jarvis_system_prompt");
+    toast.info("System prompt customizado removido.");
+  };
+  return (
+    <section className="rounded-xl border border-border bg-surface-1 p-5">
+      <div className="mb-1 flex items-center gap-2">
+        <Bot className="h-4 w-4 text-primary" />
+        <h2 className="text-sm font-semibold">System Prompt Customizado do Agente</h2>
+      </div>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Texto injetado no início de toda conversa, antes das instruções padrão. Use para definir tom, persona,
+        idioma, restrições, ou instruções específicas do seu fluxo.
+      </p>
+      <textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        rows={6}
+        placeholder="Ex: Você é um engenheiro sênior brasileiro, sempre responde em pt-BR, prefere TypeScript estrito..."
+        className="w-full resize-y rounded-md border border-border bg-surface-2 px-3 py-2 font-mono text-xs leading-relaxed outline-none focus:border-primary/60"
+      />
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <button
+          onClick={clear}
+          className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-xs hover:bg-surface-3"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Limpar
+        </button>
+        <button
+          onClick={save}
+          className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
+        >
+          <Save className="h-3.5 w-3.5" />
+          Salvar prompt
+        </button>
+      </div>
     </section>
   );
 }
