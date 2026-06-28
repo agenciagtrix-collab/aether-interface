@@ -126,7 +126,7 @@ export function ChatView() {
     try {
       await streamChatCompletion(
         [
-          { role: "system", content: REASONING_SYSTEM },
+          { role: "system", content: REASONING_SYSTEM + codeCtx },
           ...buildHistory(),
           userTurn,
         ],
@@ -208,6 +208,7 @@ export function ChatView() {
 
       const systemPrompt =
         REASONING_SYSTEM +
+        codeCtx +
         "\n\nVocê é um agente autônomo executando a missão do usuário seguindo o plano abaixo." +
         (searchContext
           ? `\n\nResultados de pesquisa web disponíveis (use e cite URLs quando relevante):\n${searchContext}`
@@ -301,23 +302,22 @@ export function ChatView() {
   };
 
   return (
-    <div className="relative flex h-full flex-col">
-      <header className="flex items-center justify-between border-b border-border px-6 py-4">
-        <div>
-          <h1 className="text-sm font-semibold tracking-tight">Chat Principal</h1>
-          <p className="text-xs text-muted-foreground">
-            {panel.mode === "agent"
-              ? "Modo Agente · raciocínio multi-etapas no terminal à direita"
-              : "Modo Conversação · raciocínio visível antes da resposta"}
+    <div className="relative flex h-full min-w-0 flex-col overflow-hidden">
+      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-sm font-semibold tracking-tight">Chat</h1>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {panel.mode === "agent" ? "Modo Agente · multi-etapas" : "Modo Conversação"}
           </p>
         </div>
         <ModeSwitcher />
       </header>
 
-      <div className="flex-1 overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-hidden">
         <MessageList />
       </div>
 
+      <CodeContextBar onContextChange={handleCodeCtx} />
       <InputBox onSubmit={handleSubmit} />
     </div>
   );
