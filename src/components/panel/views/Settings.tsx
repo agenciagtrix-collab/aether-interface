@@ -1,8 +1,140 @@
-import { useState } from "react";
-import { Eye, EyeOff, Save, RotateCcw, KeyRound } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Eye, EyeOff, Save, RotateCcw, KeyRound, RefreshCw, Search, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useSettings, type AIProvider } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
+
+interface ModelOption {
+  id: string;
+  label: string;
+  hint?: string;
+}
+
+async function fetchModels(provider: AIProvider, apiKey: string): Promise<ModelOption[]> {
+  if (provider === "openrouter") {
+    const res = await fetch("https://openrouter.ai/api/v1/models");
+    if (!res.ok) throw new Error(`OpenRouter ${res.status}`);
+    const data = await res.json();
+    return (data?.data ?? []).map((m: any) => ({
+      id: String(m.id),
+      label: String(m.name ?? m.id),
+      hint: m.pricing?.prompt === "0" ? "free" : m.context_length ? `${Math.round(Number(m.context_length) / 1000)}k ctx` : undefined,
+    }));
+  }
+  // groq requer auth
+  if (!apiKey) throw new Error("Cole a chave Groq antes de listar modelos.");
+  const res = await fetch("https://api.groq.com/openai/v1/models", {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!res.ok) throw new Error(`Groq ${res.status}`);
+  const data = await res.json();
+  return (data?.data ?? []).map((m: any) => ({ id: String(m.id), label: String(m.id) }));
+}
+
+function ModelPicker({
+  provider,
+  apiKey,
+  value,
+  onChange,
+}: {
+  provider: AIProvider;
+  apiKey: string;
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [models, setModels] = useState<ModelOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const list = await fetchModels(provider, apiKey);
+      list.sort((a, b) => a.label.localeCompare(b.label));
+      setModels(list);
+    } catch (e: any) {
+      setError(e?.message ?? "Falha ao carregar modelos");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // auto carrega openrouter (público); groq só ao clicar
+    if (provider === "openrouter") void load();
+    else setModels([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return models;
+    return models.filter((m) => m.id.toLowerCase().includes(q) || m.label.toLowerCase().includes(q));
+  }, [query, models]);
+
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between">
+        <label className="block text-xs font-medium">Modelo ({models.length} disponíveis)</label>
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading}
+          className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-2 px-2 py-1 text-[10px] hover:bg-surface-3 disabled:opacity-50"
+        >
+          <RefreshCw className={cn("h-3 w-3", loading && "animate-spin")} />
+          {loading ? "Carregando..." : "Atualizar lista"}
+        </button>
+      </div>
+
+      <div className="relative mb-2">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar (ex: deepseek, llama, free, claude)..."
+          className="w-full rounded-md border border-input bg-surface-1 py-2 pl-8 pr-3 text-xs focus:border-primary/60 focus:outline-none"
+        />
+      </div>
+
+      {error && <p className="mb-2 text-[10px] text-destructive">{error}</p>}
+
+      <div className="max-h-72 overflow-y-auto rounded-md border border-border bg-surface-2">
+        {filtered.length === 0 ? (
+          <p className="p-3 text-center text-[10px] text-muted-foreground">
+            {loading ? "Carregando..." : models.length === 0 ? "Clique em Atualizar lista." : "Nenhum modelo encontrado."}
+          </p>
+        ) : (
+          filtered.slice(0, 200).map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => onChange(m.id)}
+              className={cn(
+                "flex w-full items-center justify-between gap-2 border-b border-border/50 px-3 py-2 text-left text-[11px] last:border-0 hover:bg-surface-3",
+                value === m.id && "bg-primary/10",
+              )}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{m.label}</p>
+                <p className="truncate font-mono text-[9px] text-muted-foreground">{m.id}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {m.hint && <span className="text-[9px] uppercase text-muted-foreground">{m.hint}</span>}
+                {value === m.id && <Check className="h-3.5 w-3.5 text-primary" />}
+              </div>
+            </button>
+          ))
+        )}
+      </div>
+      <p className="mt-1.5 text-[10px] text-muted-foreground">
+        Selecionado: <span className="font-mono text-primary">{value || "—"}</span>
+      </p>
+    </div>
+  );
+}
 
 interface SecretFieldProps {
   label: string;
@@ -143,47 +275,24 @@ export function SettingsView() {
                 }
               />
 
-              <div>
-                <label className="mb-1.5 block text-xs font-medium">Modelos com raciocínio (recomendado)</label>
-                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                  {(local.provider === "groq"
-                    ? [
-                        { id: "deepseek-r1-distill-llama-70b", label: "DeepSeek R1 70B", tag: "reasoning" },
-                        { id: "qwen-qwq-32b", label: "Qwen QwQ 32B", tag: "reasoning" },
-                        { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", tag: "rápido" },
-                        { id: "openai/gpt-oss-120b", label: "GPT-OSS 120B", tag: "rápido" },
-                      ]
-                    : [
-                        { id: "deepseek/deepseek-r1:free", label: "DeepSeek R1 (free)", tag: "reasoning" },
-                        { id: "qwen/qwq-32b-preview", label: "Qwen QwQ 32B", tag: "reasoning" },
-                        { id: "deepseek/deepseek-chat-v3.1:free", label: "DeepSeek V3.1 (free)", tag: "rápido" },
-                        { id: "nousresearch/hermes-3-llama-3.1-8b", label: "Hermes 3 8B", tag: "rápido" },
-                      ]
-                  ).map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => setLocal({ ...local, model: m.id })}
-                      className={cn(
-                        "flex items-center justify-between rounded-md border px-2.5 py-1.5 text-left text-[11px] transition-all",
-                        local.model === m.id
-                          ? "border-primary/60 bg-primary/10 glow-cyber"
-                          : "border-border bg-surface-2 hover:border-primary/30",
-                      )}
-                    >
-                      <span className="font-mono">{m.label}</span>
-                      <span className="text-[9px] uppercase text-muted-foreground">{m.tag}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <TextField
-                label="Modelo (ID exato)"
+              <ModelPicker
+                provider={local.provider}
+                apiKey={local.apiKey}
                 value={local.model}
-                onChange={(v) => setLocal({ ...local, model: v })}
-                placeholder="deepseek/deepseek-r1:free"
-                hint="Modelos 'reasoning' pensam antes de responder (preenchem o bloco 🧠 Raciocínio)."
+                onChange={(id) => setLocal({ ...local, model: id })}
               />
+
+              <details className="rounded-md border border-border bg-surface-2 p-2">
+                <summary className="cursor-pointer text-[10px] text-muted-foreground">Colar ID manualmente</summary>
+                <div className="mt-2">
+                  <TextField
+                    label=""
+                    value={local.model}
+                    onChange={(v) => setLocal({ ...local, model: v })}
+                    placeholder="ex: deepseek/deepseek-r1:free"
+                  />
+                </div>
+              </details>
             </div>
           </section>
 
