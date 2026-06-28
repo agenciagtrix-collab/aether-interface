@@ -105,7 +105,7 @@ function IdeShellInner() {
       <div className="flex flex-1 overflow-hidden">
         <ActivityBar active={view} onSelect={setView} />
 
-        <PanelGroup direction="horizontal" className="flex-1">
+        <PanelGroup orientation="horizontal" className="flex-1">
           {/* Sidebar */}
           <Panel defaultSize={18} minSize={12} maxSize={35} className="bg-surface-1">
             <SidebarPanel view={view} />
@@ -114,7 +114,7 @@ function IdeShellInner() {
 
           {/* Editor + bottom terminal */}
           <Panel defaultSize={52} minSize={25}>
-            <PanelGroup direction="vertical">
+            <PanelGroup orientation="vertical">
               <Panel defaultSize={showTerminal ? 70 : 100} minSize={20}>
                 <EditorArea />
               </Panel>
