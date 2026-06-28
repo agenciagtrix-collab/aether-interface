@@ -357,6 +357,7 @@ function ModelPicker({
         ) : (
           filtered.slice(0, 300).map((m) => {
             const mayRateLimit = m.isFree && /venice|auto/i.test(m.id);
+            const isPresetHighlighted = QUICK_PRESETS.some((p) => p.highlightIds.includes(m.id));
             return (
               <button
                 key={m.id}
@@ -365,10 +366,14 @@ function ModelPicker({
                 className={cn(
                   "flex w-full items-center justify-between gap-2 border-b border-border/50 px-3 py-2 text-left text-[11px] last:border-0 hover:bg-surface-3",
                   value === m.id && "bg-primary/10",
+                  isPresetHighlighted && value !== m.id && "bg-amber-500/5",
                 )}
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
+                    {isPresetHighlighted && (
+                      <span title="Recomendado por preset rápido">⭐</span>
+                    )}
                     {m.isUncensored && <Flame className="h-3 w-3 shrink-0 text-orange-400" />}
                     <p className="truncate font-medium">{m.label}</p>
                   </div>
@@ -403,6 +408,12 @@ function ModelPicker({
       <p className="mt-1.5 text-[10px] text-muted-foreground">
         Selecionado: <span className="font-mono text-primary">{value || "—"}</span>
       </p>
+      {describeModel(value) && (
+        <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-2.5 py-1.5 text-[10px] text-primary/90">
+          <Info className="mt-0.5 h-3 w-3 shrink-0" />
+          <span>{describeModel(value)}</span>
+        </div>
+      )}
     </div>
   );
 }
