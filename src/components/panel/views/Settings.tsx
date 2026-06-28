@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, EyeOff, Save, RotateCcw, KeyRound, RefreshCw, Search, Check, Flame, AlertTriangle, Zap } from "lucide-react";
+import { Eye, EyeOff, Save, RotateCcw, KeyRound, RefreshCw, Search, Check, Flame, AlertTriangle, Zap, Bot, Unlock, Rocket, Info } from "lucide-react";
 import { toast } from "sonner";
 import { useSettings, type AIProvider } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
