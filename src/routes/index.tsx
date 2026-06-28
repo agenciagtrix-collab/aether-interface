@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AppShell } from "@/components/panel/AppShell";
+import { IdeShell } from "@/components/ide/IdeShell";
 import { PanelProvider } from "@/components/panel/PanelContext";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Painel de IA Autônomo" },
-      { name: "description", content: "Orquestre agentes de IA com terminal de pensamento em tempo real." },
+      { title: "IDE de IA Autônoma" },
+      { name: "description", content: "IDE estilo VSCode com chat de IA integrado: abra pastas locais, edite arquivos e converse com o modelo sobre o código." },
     ],
   }),
   component: Index,
@@ -15,7 +15,7 @@ export const Route = createFileRoute("/")({
 function Index() {
   return (
     <PanelProvider>
-      <AppShell />
+      <IdeShell />
     </PanelProvider>
   );
 }
