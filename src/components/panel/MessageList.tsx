@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, User, Sparkles, Paperclip, Brain, ChevronDown } from "lucide-react";
+import { Bot, User, Sparkles, Paperclip, Brain, ChevronDown, Unlock } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { usePanel } from "./PanelContext";
 import { CodeBlock } from "./CodeBlock";
 import { cn } from "@/lib/utils";
+
+interface MessageListProps {
+  onResendUncensored?: (assistantId: string) => void;
+}
 
 function TypingDots() {
   return (
