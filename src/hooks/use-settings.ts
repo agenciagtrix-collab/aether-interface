@@ -9,7 +9,13 @@ export interface Settings {
   webSearchApiKey: string;
 }
 
-const STORAGE_KEY = "lovable.ai-panel.settings.v1";
+// Chaves padrão (compatíveis com leitura direta em src/lib/ai-clients.ts)
+const KEYS = {
+  provider: "jarvis_provider",
+  apiKey: "jarvis_api_key",
+  model: "jarvis_model",
+  webSearchApiKey: "jarvis_search_key",
+} as const;
 
 const DEFAULT_SETTINGS: Settings = {
   provider: "openrouter",
@@ -19,31 +25,49 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 const listeners = new Set<() => void>();
-let cache: Settings | null = null;
 
 function read(): Settings {
-  if (cache) return cache;
-  if (typeof window === "undefined") {
+  if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  try {
+    const provider = (window.localStorage.getItem(KEYS.provider) as AIProvider) || DEFAULT_SETTINGS.provider;
+    return {
+      provider: provider === "groq" ? "groq" : "openrouter",
+      apiKey: window.localStorage.getItem(KEYS.apiKey) ?? "",
+      model: window.localStorage.getItem(KEYS.model) ?? DEFAULT_SETTINGS.model,
+      webSearchApiKey: window.localStorage.getItem(KEYS.webSearchApiKey) ?? "",
+    };
+  } catch {
     return DEFAULT_SETTINGS;
   }
-  let next: Settings = DEFAULT_SETTINGS;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) next = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
-  } catch {
-    next = DEFAULT_SETTINGS;
+}
+
+// Cache estável para useSyncExternalStore (precisa retornar a mesma ref se nada mudou)
+let snapshot: Settings = DEFAULT_SETTINGS;
+let snapshotInit = false;
+function getSnapshot(): Settings {
+  const next = read();
+  if (
+    !snapshotInit ||
+    next.provider !== snapshot.provider ||
+    next.apiKey !== snapshot.apiKey ||
+    next.model !== snapshot.model ||
+    next.webSearchApiKey !== snapshot.webSearchApiKey
+  ) {
+    snapshot = next;
+    snapshotInit = true;
   }
-  cache = next;
-  return next;
+  return snapshot;
 }
 
 function write(next: Settings) {
-  cache = next;
   if (typeof window !== "undefined") {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      window.localStorage.setItem(KEYS.provider, next.provider);
+      window.localStorage.setItem(KEYS.apiKey, next.apiKey);
+      window.localStorage.setItem(KEYS.model, next.model);
+      window.localStorage.setItem(KEYS.webSearchApiKey, next.webSearchApiKey);
     } catch {
-      // ignore quota errors
+      // ignora erros de quota
     }
   }
   listeners.forEach((l) => l());
@@ -55,7 +79,7 @@ function subscribe(cb: () => void) {
 }
 
 export function useSettings() {
-  const settings = useSyncExternalStore(subscribe, read, () => DEFAULT_SETTINGS);
+  const settings = useSyncExternalStore(subscribe, getSnapshot, () => DEFAULT_SETTINGS);
 
   const update = useCallback((patch: Partial<Settings>) => {
     write({ ...read(), ...patch });

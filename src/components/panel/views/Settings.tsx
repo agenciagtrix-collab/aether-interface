@@ -182,7 +182,7 @@ export function SettingsView() {
           </div>
 
           <p className="text-center text-[10px] text-muted-foreground">
-            Para chamadas reais, abra <span className="font-mono text-primary">src/lib/ai-clients.ts</span> e descomente as funções de fetch.
+            As chaves são lidas diretamente do <span className="font-mono text-primary">localStorage</span> (jarvis_api_key, jarvis_model, jarvis_search_key, jarvis_provider) por <span className="font-mono text-primary">src/lib/ai-clients.ts</span>.
           </p>
         </div>
       </div>
