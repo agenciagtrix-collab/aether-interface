@@ -245,7 +245,7 @@ export function ChatView() {
       const asstId = panel.addMessage({ role: "assistant", mode: "agent", content: "", streaming: true });
 
       const systemPrompt =
-        REASONING_SYSTEM +
+        getReasoningSystem() +
         codeCtx +
         "\n\nVocê é um agente autônomo executando a missão do usuário seguindo o plano abaixo." +
         (searchContext
