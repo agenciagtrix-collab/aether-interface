@@ -16,11 +16,21 @@ export interface OpenTab {
   dirty: boolean;
 }
 
+export interface FileEdit {
+  id: string;
+  path: string;
+  previousContent: string | null; // null = arquivo novo
+  newContent: string;
+  timestamp: number;
+  reverted?: boolean;
+}
+
 interface WorkspaceState {
   adapter: FsAdapter | null;
   rootName: string | null;
   tabs: OpenTab[];
   activeTabPath: string | null;
+  edits: FileEdit[];
   /** Abre o picker nativo (Chromium) — throws se não suportado. */
   openNativeFolder: () => Promise<void>;
   /** Adapter a partir de upload de pasta (fallback). */
@@ -32,6 +42,10 @@ interface WorkspaceState {
   updateTabContent: (path: string, content: string) => void;
   saveTab: (path: string) => Promise<void>;
   saveAll: () => Promise<void>;
+  /** Escreve/cria arquivo no disco, registra snapshot p/ undo e abre a aba. */
+  applyEdit: (path: string, content: string) => Promise<FileEdit | null>;
+  /** Desfaz uma edição registrada (restaura conteúdo anterior). */
+  revertEdit: (id: string) => Promise<void>;
   supportsWrite: boolean;
 }
 
