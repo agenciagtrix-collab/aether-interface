@@ -29,7 +29,7 @@ export function InputBox({ onSubmit }: Props) {
       : "Envie uma mensagem...";
 
   const submit = () => {
-    const t = value.trim();
+    const t = value.trim() || (attachedFiles.length > 0 ? "Analise os arquivos anexados." : "");
     if (!t || isRunning || isReadingFiles) return;
     onSubmit(t);
     setValue("");
@@ -155,7 +155,7 @@ export function InputBox({ onSubmit }: Props) {
             <button
               type="button"
               onClick={submit}
-              disabled={!value.trim() || isRunning || isReadingFiles}
+                disabled={(!value.trim() && attachedFiles.length === 0) || isRunning || isReadingFiles}
               aria-label="Enviar mensagem"
               className={cn(
                 "flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-all",
