@@ -184,8 +184,9 @@ export function SettingsView() {
                 placeholder="deepseek/deepseek-r1:free"
                 hint="Modelos 'reasoning' pensam antes de responder (preenchem o bloco 🧠 Raciocínio)."
               />
-
+            </div>
           </section>
+
 
           <section className="rounded-xl border border-border bg-surface-1 p-5">
             <h2 className="mb-4 text-sm font-semibold">Pesquisa Web</h2>
