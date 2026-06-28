@@ -155,7 +155,7 @@ export function InputBox({ onSubmit }: Props) {
 
         <p className="mt-2 text-center text-[10px] text-muted-foreground">
           {mode === "agent"
-            ? "Enter envia · Shift+Enter quebra linha · execução simulada no terminal"
+            ? "Enter envia · Shift+Enter quebra linha · raciocínio ao vivo no terminal"
             : "Enter envia · Shift+Enter quebra linha"}
         </p>
       </div>

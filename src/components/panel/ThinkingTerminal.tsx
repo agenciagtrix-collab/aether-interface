@@ -53,7 +53,7 @@ export function ThinkingTerminal() {
       </div>
 
       <footer className="border-t border-border px-4 py-2 font-mono text-[10px] text-muted-foreground">
-        <span className="text-primary">●</span> autonomous-agent v0.1 · simulação local
+        <span className="text-primary">●</span> autonomous-agent v0.1 · execução real
       </footer>
     </div>
   );
