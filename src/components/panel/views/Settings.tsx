@@ -298,6 +298,39 @@ function ModelPicker({
         )}
       </div>
 
+      {/* Filtros Rápidos por Objetivo */}
+      <div className="mb-3 rounded-lg border border-border bg-gradient-to-br from-surface-2 to-surface-1 p-2.5">
+        <p className="mb-2 flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <Info className="h-3 w-3" /> Filtros rápidos por objetivo — escolha em 1 clique
+        </p>
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+          {QUICK_PRESETS.map((p) => {
+            const Icon = p.icon;
+            const active = p.highlightIds.includes(value);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                title={p.tooltip}
+                onClick={() => {
+                  setQuery(p.filterQuery);
+                  onChange(p.primaryId);
+                  toast.success(`Preset aplicado: ${p.label}`);
+                }}
+                className={cn(
+                  "group relative flex items-start gap-2 rounded-md border bg-gradient-to-br p-2 text-left text-[10px] transition-all hover:scale-[1.02] hover:shadow-lg",
+                  p.accent,
+                  active && "ring-2 ring-primary/60",
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="font-medium leading-tight">{p.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="relative mb-2">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
         <input
@@ -307,6 +340,7 @@ function ModelPicker({
           className="w-full rounded-md border border-input bg-surface-1 py-2 pl-8 pr-3 text-xs focus:border-primary/60 focus:outline-none"
         />
       </div>
+
 
       {error && (
         <p className="mb-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-[10px] text-destructive">
