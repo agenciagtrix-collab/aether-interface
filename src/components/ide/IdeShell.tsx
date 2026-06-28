@@ -307,6 +307,12 @@ function IdeShellInner() {
             </>
           )}
 
+          <Panel
+            id="ide-main"
+            defaultSize="52%"
+            minSize="320px"
+            style={{ overflow: "hidden" }}
+          >
             <PanelGroup
               id="ide-editor-layout"
               orientation="vertical"
