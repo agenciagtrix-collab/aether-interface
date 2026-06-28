@@ -18,6 +18,9 @@ export interface ChatMsg {
   content: string;
   timestamp: number;
   mode: ChatMode;
+  attachments?: string[];
+  thinking?: string;
+  streaming?: boolean;
 }
 
 interface PanelState {
@@ -35,7 +38,8 @@ interface PanelState {
   clearAttachedFiles: () => void;
 
   messages: ChatMsg[];
-  addMessage: (m: Omit<ChatMsg, "id" | "timestamp">) => void;
+  addMessage: (m: Omit<ChatMsg, "id" | "timestamp">) => string;
+  updateMessage: (id: string, patch: Partial<ChatMsg> | ((m: ChatMsg) => Partial<ChatMsg>)) => void;
   clearMessages: () => void;
 
   terminalSteps: TerminalStep[];
@@ -44,6 +48,9 @@ interface PanelState {
 
   isRunning: boolean;
   setRunning: (b: boolean) => void;
+
+  statusText: string;
+  setStatusText: (s: string) => void;
 }
 
 const Ctx = createContext<PanelState | null>(null);
@@ -56,6 +63,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [terminalSteps, setTerminalSteps] = useState<TerminalStep[]>([]);
   const [isRunning, setRunning] = useState(false);
+  const [statusText, setStatusText] = useState("");
 
   const value = useMemo<PanelState>(
     () => ({
@@ -69,19 +77,27 @@ export function PanelProvider({ children }: { children: ReactNode }) {
       addAttachedFile: (name) => setAttachedFiles((f) => [...f, name]),
       clearAttachedFiles: () => setAttachedFiles([]),
       messages,
-      addMessage: (m) =>
-        setMessages((prev) => [
-          ...prev,
-          { ...m, id: crypto.randomUUID(), timestamp: Date.now() },
-        ]),
+      addMessage: (m) => {
+        const id = crypto.randomUUID();
+        setMessages((prev) => [...prev, { ...m, id, timestamp: Date.now() }]);
+        return id;
+      },
+      updateMessage: (id, patch) =>
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === id ? { ...msg, ...(typeof patch === "function" ? patch(msg) : patch) } : msg,
+          ),
+        ),
       clearMessages: () => setMessages([]),
       terminalSteps,
       setTerminalSteps,
       clearTerminal: () => setTerminalSteps([]),
       isRunning,
       setRunning,
+      statusText,
+      setStatusText,
     }),
-    [activeTab, mode, webSearchEnabled, attachedFiles, messages, terminalSteps, isRunning],
+    [activeTab, mode, webSearchEnabled, attachedFiles, messages, terminalSteps, isRunning, statusText],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

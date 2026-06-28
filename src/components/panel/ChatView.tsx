@@ -4,18 +4,30 @@ import { InputBox } from "./InputBox";
 import { usePanel, type TerminalStep } from "./PanelContext";
 import {
   callChatCompletion,
+  streamChatCompletion,
   webSearch,
   type ChatMessage,
 } from "@/lib/ai-clients";
 
 const uid = () => crypto.randomUUID();
 
+// extrai blocos <think>...</think> separando raciocínio da resposta final
+function splitThinking(raw: string): { thinking: string; answer: string } {
+  const re = /<think>([\s\S]*?)<\/think>/gi;
+  const thinks: string[] = [];
+  const answer = raw.replace(re, (_, inner) => {
+    thinks.push(String(inner).trim());
+    return "";
+  }).trim();
+  return { thinking: thinks.join("\n\n"), answer: answer || raw.trim() };
+}
+
 export function ChatView() {
   const panel = usePanel();
 
   const buildHistory = (extra: ChatMessage[] = []): ChatMessage[] => {
     const history: ChatMessage[] = panel.messages
-      .filter((m) => m.role === "user" || m.role === "assistant")
+      .filter((m) => (m.role === "user" || m.role === "assistant") && m.content.trim().length > 0)
       .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
     return [...history, ...extra];
   };
@@ -25,30 +37,94 @@ export function ChatView() {
     panel.setTerminalSteps((prev) => [...prev, full]);
     return full.id;
   };
-
   const updateStep = (id: string, patch: Partial<TerminalStep>) => {
-    panel.setTerminalSteps((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, ...patch } : s)),
-    );
+    panel.setTerminalSteps((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   };
 
-  const runChat = async (text: string) => {
+  const REASONING_SYSTEM =
+    "Você é um assistente cuidadoso. Antes de responder, pense passo a passo dentro de um bloco <think>...</think> " +
+    "explicando seu raciocínio. Em seguida, FORA do bloco, escreva a resposta final ao usuário em português, " +
+    "clara e bem formatada. Sempre inclua o bloco <think> antes da resposta.";
+
+  const runChat = async (text: string, attachments: string[]) => {
+    panel.setStatusText("Pensando");
+    const asstId = panel.addMessage({ role: "assistant", mode: "chat", content: "", streaming: true });
+
+    const userTurn: ChatMessage = {
+      role: "user",
+      content: attachments.length
+        ? `${text}\n\n[Arquivos anexados: ${attachments.join(", ")}]`
+        : text,
+    };
+
+    let buffer = "";
+    let inThink = false;
+    let thinkText = "";
+    let answerText = "";
+
+    const flush = (chunk: string) => {
+      buffer += chunk;
+      // processa tags <think> incrementalmente
+      while (true) {
+        if (!inThink) {
+          const open = buffer.indexOf("<think>");
+          if (open === -1) {
+            answerText += buffer;
+            buffer = "";
+            break;
+          }
+          answerText += buffer.slice(0, open);
+          buffer = buffer.slice(open + 7);
+          inThink = true;
+          panel.setStatusText("Raciocinando");
+        } else {
+          const close = buffer.indexOf("</think>");
+          if (close === -1) {
+            thinkText += buffer;
+            buffer = "";
+            break;
+          }
+          thinkText += buffer.slice(0, close);
+          buffer = buffer.slice(close + 8);
+          inThink = false;
+          panel.setStatusText("Escrevendo resposta");
+        }
+      }
+      panel.updateMessage(asstId, { content: answerText.trim(), thinking: thinkText.trim() });
+    };
+
     try {
-      const reply = await callChatCompletion(
-        buildHistory([{ role: "user", content: text }]),
+      await streamChatCompletion(
+        [
+          { role: "system", content: REASONING_SYSTEM },
+          ...buildHistory(),
+          userTurn,
+        ],
+        { onDelta: flush, temperature: 0.7 },
       );
-      panel.addMessage({ role: "assistant", mode: "chat", content: reply });
-    } catch (err: any) {
-      panel.addMessage({
-        role: "assistant",
-        mode: "chat",
-        content: `❌ Erro: ${err?.message ?? String(err)}`,
+
+      // fallback: se não houve <think>, trata buffer como resposta
+      if (buffer) answerText += buffer;
+      const finalParsed = splitThinking((thinkText ? `<think>${thinkText}</think>` : "") + answerText);
+      panel.updateMessage(asstId, {
+        content: finalParsed.answer,
+        thinking: finalParsed.thinking,
+        streaming: false,
       });
+    } catch (err: any) {
+      panel.updateMessage(asstId, {
+        content: `❌ Erro: ${err?.message ?? String(err)}`,
+        streaming: false,
+      });
+    } finally {
+      panel.setStatusText("");
     }
   };
 
-  const runAgent = async (text: string) => {
+  const runAgent = async (text: string, attachments: string[]) => {
     panel.clearTerminal();
+    panel.setStatusText("Analisando missão");
+
     try {
       // 1) Plano
       const planStep = pushStep({ status: "running", label: "Analisando a missão e gerando plano..." });
@@ -56,7 +132,7 @@ export function ChatView() {
         {
           role: "system",
           content:
-            "Você é um agente autônomo. Receba uma missão do usuário e responda APENAS com uma lista numerada curta (3 a 6 passos) descrevendo como executá-la. Sem preâmbulo.",
+            "Você é um agente autônomo. Responda APENAS com uma lista numerada curta (3 a 6 passos) descrevendo como executar a missão. Sem preâmbulo.",
         },
         { role: "user", content: text },
       ]);
@@ -65,6 +141,7 @@ export function ChatView() {
       // 2) Busca web (opcional)
       let searchContext = "";
       if (panel.webSearchEnabled) {
+        panel.setStatusText("Pesquisando na web");
         const sId = pushStep({
           status: "running",
           label: "Pesquisando na web em tempo real...",
@@ -86,33 +163,76 @@ export function ChatView() {
         }
       }
 
-      if (panel.attachedFiles.length > 0) {
+      if (attachments.length > 0) {
         pushStep({
           status: "done",
           label: "Anexos registrados (somente nomes nesta versão)",
-          detail: panel.attachedFiles.join(", "),
+          detail: attachments.join(", "),
         });
       }
 
-      // 3) Execução / síntese
-      const execStep = pushStep({ status: "running", label: "Executando raciocínio e sintetizando resposta..." });
+      // 3) Execução com streaming + raciocínio visível
+      panel.setStatusText("Raciocinando e respondendo");
+      const execStep = pushStep({ status: "running", label: "Raciocinando e sintetizando resposta..." });
+      const asstId = panel.addMessage({ role: "assistant", mode: "agent", content: "", streaming: true });
+
       const systemPrompt =
-        "Você é um agente autônomo de alta performance. Execute a missão do usuário seguindo o plano. " +
-        "Seja claro, objetivo e responda em português." +
+        REASONING_SYSTEM +
+        "\n\nVocê é um agente autônomo executando a missão do usuário seguindo o plano abaixo." +
         (searchContext
-          ? `\n\nResultados de pesquisa web disponíveis:\n${searchContext}\n\nUse-os como fonte quando relevante e cite a URL.`
+          ? `\n\nResultados de pesquisa web disponíveis (use e cite URLs quando relevante):\n${searchContext}`
           : "");
 
-      const finalAnswer = await callChatCompletion([
-        { role: "system", content: systemPrompt },
-        ...buildHistory(),
-        { role: "user", content: `Missão: ${text}\n\nPlano sugerido:\n${plan}\n\nExecute agora e entregue a resposta final.` },
-      ]);
+      let buffer = "";
+      let inThink = false;
+      let thinkText = "";
+      let answerText = "";
+
+      const flush = (chunk: string) => {
+        buffer += chunk;
+        while (true) {
+          if (!inThink) {
+            const open = buffer.indexOf("<think>");
+            if (open === -1) { answerText += buffer; buffer = ""; break; }
+            answerText += buffer.slice(0, open);
+            buffer = buffer.slice(open + 7);
+            inThink = true;
+          } else {
+            const close = buffer.indexOf("</think>");
+            if (close === -1) { thinkText += buffer; buffer = ""; break; }
+            thinkText += buffer.slice(0, close);
+            buffer = buffer.slice(close + 8);
+            inThink = false;
+          }
+        }
+        panel.updateMessage(asstId, { content: answerText.trim(), thinking: thinkText.trim() });
+        // espelha raciocínio no terminal lateral
+        if (thinkText.trim()) {
+          updateStep(execStep, { detail: thinkText.trim().slice(-600) });
+        }
+      };
+
+      await streamChatCompletion(
+        [
+          { role: "system", content: systemPrompt },
+          ...buildHistory(),
+          {
+            role: "user",
+            content: `Missão: ${text}${attachments.length ? `\nAnexos: ${attachments.join(", ")}` : ""}\n\nPlano:\n${plan}\n\nExecute agora.`,
+          },
+        ],
+        { onDelta: flush, temperature: 0.7 },
+      );
+
+      if (buffer) answerText += buffer;
+      const finalParsed = splitThinking((thinkText ? `<think>${thinkText}</think>` : "") + answerText);
+      panel.updateMessage(asstId, {
+        content: finalParsed.answer,
+        thinking: finalParsed.thinking,
+        streaming: false,
+      });
       updateStep(execStep, { status: "done" });
-
       pushStep({ status: "done", label: "Missão concluída." });
-
-      panel.addMessage({ role: "assistant", mode: "agent", content: finalAnswer });
     } catch (err: any) {
       panel.setTerminalSteps((prev) => {
         const last = prev[prev.length - 1];
@@ -123,13 +243,7 @@ export function ChatView() {
         }
         return [
           ...prev,
-          {
-            id: uid(),
-            status: "error",
-            label: "Falha na execução",
-            detail: err?.message ?? String(err),
-            timestamp: Date.now(),
-          },
+          { id: uid(), status: "error", label: "Falha na execução", detail: err?.message ?? String(err), timestamp: Date.now() },
         ];
       });
       panel.addMessage({
@@ -137,19 +251,22 @@ export function ChatView() {
         mode: "agent",
         content: `❌ Erro: ${err?.message ?? String(err)}`,
       });
+    } finally {
+      panel.setStatusText("");
     }
   };
 
   const handleSubmit = async (text: string) => {
     if (!text.trim() || panel.isRunning) return;
-    panel.addMessage({ role: "user", content: text, mode: panel.mode });
+    const attachments = [...panel.attachedFiles];
+    panel.addMessage({ role: "user", content: text, mode: panel.mode, attachments });
+    panel.clearAttachedFiles();
     panel.setRunning(true);
     try {
-      if (panel.mode === "agent") await runAgent(text);
-      else await runChat(text);
+      if (panel.mode === "agent") await runAgent(text, attachments);
+      else await runChat(text, attachments);
     } finally {
       panel.setRunning(false);
-      panel.clearAttachedFiles();
     }
   };
 
@@ -161,7 +278,7 @@ export function ChatView() {
           <p className="text-xs text-muted-foreground">
             {panel.mode === "agent"
               ? "Modo Agente · raciocínio multi-etapas no terminal à direita"
-              : "Modo Conversação · respostas diretas"}
+              : "Modo Conversação · raciocínio visível antes da resposta"}
           </p>
         </div>
         <ModeSwitcher />
