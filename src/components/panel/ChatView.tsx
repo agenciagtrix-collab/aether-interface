@@ -30,7 +30,15 @@ export function ChatView() {
   const buildHistory = (extra: ChatMessage[] = []): ChatMessage[] => {
     const history: ChatMessage[] = panel.messages
       .filter((m) => (m.role === "user" || m.role === "assistant") && m.content.trim().length > 0)
-      .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+      .map((m) => {
+        const attachmentContext = m.role === "user" ? buildAttachmentContext(m.attachments ?? []) : "";
+        return {
+          role: m.role as "user" | "assistant",
+          content: attachmentContext
+            ? `${m.content}\n\n[Contexto real dos arquivos anexados]\n${attachmentContext}`
+            : m.content,
+        };
+      });
     return [...history, ...extra];
   };
 
