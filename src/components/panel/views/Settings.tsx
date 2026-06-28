@@ -617,3 +617,28 @@ export function SettingsView() {
     </div>
   );
 }
+
+function AutoApplySection() {
+  const [enabled, setEnabled] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("jarvis_auto_apply") === "1",
+  );
+  const toggle = () => {
+    const next = !enabled;
+    setEnabled(next);
+    localStorage.setItem("jarvis_auto_apply", next ? "1" : "0");
+    toast.success(next ? "Auto-aplicar ativado" : "Auto-aplicar desativado");
+  };
+  return (
+    <section className="rounded-xl border border-border bg-surface-1 p-5">
+      <h2 className="mb-1 text-sm font-semibold">Auto-aplicar edições (Modo Agente)</h2>
+      <p className="mb-4 text-xs text-muted-foreground">
+        Quando ativo, blocos de código com caminho (<span className="font-mono text-primary">```ts:src/x.ts</span>)
+        recebidos no modo Agente abrem uma confirmação para gravar direto no arquivo, sem clique manual.
+      </p>
+      <label className="flex cursor-pointer items-center gap-3">
+        <input type="checkbox" checked={enabled} onChange={toggle} className="h-4 w-4 accent-primary" />
+        <span className="text-xs">Ativar auto-aplicar com confirmação</span>
+      </label>
+    </section>
+  );
+}
