@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, User, Sparkles, Paperclip, Brain, ChevronDown } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { usePanel } from "./PanelContext";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +33,42 @@ function ThinkingBlock({ text }: { text: string }) {
         <pre className="max-h-56 overflow-y-auto whitespace-pre-wrap border-t border-border px-2.5 py-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
           {text}
         </pre>
+      )}
+    </div>
+  );
+}
+
+function MarkdownMessage({ content, streaming }: { content: string; streaming?: boolean }) {
+  return (
+    <div className="space-y-2 text-sm leading-relaxed">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p: ({ children }) => <p className="whitespace-pre-wrap">{children}</p>,
+          ul: ({ children }) => <ul className="ml-5 list-disc space-y-1">{children}</ul>,
+          ol: ({ children }) => <ol className="ml-5 list-decimal space-y-1">{children}</ol>,
+          li: ({ children }) => <li className="pl-1">{children}</li>,
+          pre: ({ children }) => (
+            <pre className="my-3 max-w-full overflow-x-auto rounded-lg border border-border bg-background/70 p-3 text-xs leading-relaxed">
+              {children}
+            </pre>
+          ),
+          code: ({ children, className }) => (
+            <code className={cn("rounded bg-background/60 px-1 py-0.5 font-mono text-[0.86em]", className)}>
+              {children}
+            </code>
+          ),
+          a: ({ children, href }) => (
+            <a href={href} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+      {streaming && (
+        <span className="ml-0.5 inline-block h-3 w-1.5 translate-y-0.5 bg-primary caret-blink" />
       )}
     </div>
   );
@@ -100,12 +138,16 @@ export function MessageList() {
               {m.role === "assistant" && m.thinking && <ThinkingBlock text={m.thinking} />}
 
               {m.content ? (
-                <p className="whitespace-pre-wrap">
-                  {m.content}
-                  {m.streaming && (
-                    <span className="ml-0.5 inline-block h-3 w-1.5 translate-y-0.5 bg-primary caret-blink" />
-                  )}
-                </p>
+                m.role === "assistant" ? (
+                  <MarkdownMessage content={m.content} streaming={m.streaming} />
+                ) : (
+                  <p className="whitespace-pre-wrap">
+                    {m.content}
+                    {m.streaming && (
+                      <span className="ml-0.5 inline-block h-3 w-1.5 translate-y-0.5 bg-primary caret-blink" />
+                    )}
+                  </p>
+                )
               ) : m.streaming ? (
                 <span className="inline-flex items-center gap-2 text-muted-foreground">
                   <Brain className="h-3.5 w-3.5 text-primary animate-pulse" />
@@ -115,18 +157,19 @@ export function MessageList() {
 
               {m.attachments && m.attachments.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {m.attachments.map((f, i) => (
+                  {m.attachments.map((f) => (
                     <span
-                      key={i}
+                      key={f.id}
                       className={cn(
                         "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px]",
                         m.role === "user"
                           ? "border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground"
                           : "border-border bg-background/40 text-muted-foreground",
                       )}
+                      title={f.summary}
                     >
                       <Paperclip className="h-3 w-3" />
-                      {f}
+                      {f.name}
                     </span>
                   ))}
                 </div>

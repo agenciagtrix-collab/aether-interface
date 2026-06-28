@@ -2,6 +2,7 @@ import { useRef, useState, type KeyboardEvent } from "react";
 import { Globe, Paperclip, SendHorizonal, X } from "lucide-react";
 import { usePanel } from "./PanelContext";
 import { cn } from "@/lib/utils";
+import { readAttachment } from "@/lib/file-readers";
 
 interface Props {
   onSubmit: (text: string) => void;
@@ -9,6 +10,7 @@ interface Props {
 
 export function InputBox({ onSubmit }: Props) {
   const [value, setValue] = useState("");
+  const [isReadingFiles, setIsReadingFiles] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const {
@@ -27,8 +29,8 @@ export function InputBox({ onSubmit }: Props) {
       : "Envie uma mensagem...";
 
   const submit = () => {
-    const t = value.trim();
-    if (!t || isRunning) return;
+    const t = value.trim() || (attachedFiles.length > 0 ? "Analise os arquivos anexados." : "");
+    if (!t || isRunning || isReadingFiles) return;
     onSubmit(t);
     setValue("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
@@ -48,10 +50,16 @@ export function InputBox({ onSubmit }: Props) {
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
   };
 
-  const onFiles = (files: FileList | null) => {
+  const onFiles = async (files: FileList | null) => {
     if (!files) return;
-    Array.from(files).forEach((f) => addAttachedFile(f.name));
-    if (fileRef.current) fileRef.current.value = "";
+    setIsReadingFiles(true);
+    try {
+      const parsed = await Promise.all(Array.from(files).map((file) => readAttachment(file)));
+      parsed.forEach((file) => addAttachedFile(file));
+    } finally {
+      setIsReadingFiles(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   };
 
   return (
@@ -59,13 +67,14 @@ export function InputBox({ onSubmit }: Props) {
       <div className="mx-auto max-w-3xl">
         {attachedFiles.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-1.5">
-            {attachedFiles.map((f, i) => (
+            {attachedFiles.map((f) => (
               <span
-                key={i}
+                key={f.id}
                 className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-2 py-1 text-xs"
+                title={f.summary}
               >
                 <Paperclip className="h-3 w-3 text-muted-foreground" />
-                {f}
+                {f.name}
               </span>
             ))}
             <button
@@ -116,11 +125,12 @@ export function InputBox({ onSubmit }: Props) {
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
+                disabled={isReadingFiles}
                 title="Anexar arquivo"
                 aria-label="Anexar arquivo"
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-transparent text-muted-foreground transition-colors hover:text-foreground hover:bg-surface-2"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-transparent text-muted-foreground transition-colors hover:text-foreground hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Paperclip className="h-4 w-4" />
+                <Paperclip className={cn("h-4 w-4", isReadingFiles && "animate-pulse")} />
               </button>
               <input
                 ref={fileRef}
@@ -135,12 +145,17 @@ export function InputBox({ onSubmit }: Props) {
                   web ativo
                 </span>
               )}
+              {isReadingFiles && (
+                <span className="ml-1 text-[10px] uppercase tracking-wider text-muted-foreground animate-pulse">
+                  lendo arquivo
+                </span>
+              )}
             </div>
 
             <button
               type="button"
               onClick={submit}
-              disabled={!value.trim() || isRunning}
+                disabled={(!value.trim() && attachedFiles.length === 0) || isRunning || isReadingFiles}
               aria-label="Enviar mensagem"
               className={cn(
                 "flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-all",

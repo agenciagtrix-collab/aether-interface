@@ -12,13 +12,25 @@ export interface TerminalStep {
   timestamp: number;
 }
 
+export interface AttachedFile {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  kind: "text" | "archive" | "image" | "binary" | "error";
+  summary: string;
+  content?: string;
+  dataUrl?: string;
+  error?: string;
+}
+
 export interface ChatMsg {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
   timestamp: number;
   mode: ChatMode;
-  attachments?: string[];
+  attachments?: AttachedFile[];
   thinking?: string;
   streaming?: boolean;
 }
@@ -33,8 +45,8 @@ interface PanelState {
   webSearchEnabled: boolean;
   toggleWebSearch: () => void;
 
-  attachedFiles: string[];
-  addAttachedFile: (name: string) => void;
+  attachedFiles: AttachedFile[];
+  addAttachedFile: (file: AttachedFile) => void;
   clearAttachedFiles: () => void;
 
   messages: ChatMsg[];
@@ -59,7 +71,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   const [activeTab, setActiveTab] = useState<PanelTab>("chat");
   const [mode, setMode] = useState<ChatMode>("chat");
   const [webSearchEnabled, setWebSearch] = useState(false);
-  const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [terminalSteps, setTerminalSteps] = useState<TerminalStep[]>([]);
   const [isRunning, setRunning] = useState(false);
@@ -74,7 +86,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
       webSearchEnabled,
       toggleWebSearch: () => setWebSearch((v) => !v),
       attachedFiles,
-      addAttachedFile: (name) => setAttachedFiles((f) => [...f, name]),
+      addAttachedFile: (file) => setAttachedFiles((f) => [...f, file]),
       clearAttachedFiles: () => setAttachedFiles([]),
       messages,
       addMessage: (m) => {
