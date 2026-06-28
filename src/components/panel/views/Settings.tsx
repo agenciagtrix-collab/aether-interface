@@ -143,14 +143,48 @@ export function SettingsView() {
                 }
               />
 
+              <div>
+                <label className="mb-1.5 block text-xs font-medium">Modelos com raciocínio (recomendado)</label>
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  {(local.provider === "groq"
+                    ? [
+                        { id: "deepseek-r1-distill-llama-70b", label: "DeepSeek R1 70B", tag: "reasoning" },
+                        { id: "qwen-qwq-32b", label: "Qwen QwQ 32B", tag: "reasoning" },
+                        { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", tag: "rápido" },
+                        { id: "openai/gpt-oss-120b", label: "GPT-OSS 120B", tag: "rápido" },
+                      ]
+                    : [
+                        { id: "deepseek/deepseek-r1:free", label: "DeepSeek R1 (free)", tag: "reasoning" },
+                        { id: "qwen/qwq-32b-preview", label: "Qwen QwQ 32B", tag: "reasoning" },
+                        { id: "deepseek/deepseek-chat-v3.1:free", label: "DeepSeek V3.1 (free)", tag: "rápido" },
+                        { id: "nousresearch/hermes-3-llama-3.1-8b", label: "Hermes 3 8B", tag: "rápido" },
+                      ]
+                  ).map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => setLocal({ ...local, model: m.id })}
+                      className={cn(
+                        "flex items-center justify-between rounded-md border px-2.5 py-1.5 text-left text-[11px] transition-all",
+                        local.model === m.id
+                          ? "border-primary/60 bg-primary/10 glow-cyber"
+                          : "border-border bg-surface-2 hover:border-primary/30",
+                      )}
+                    >
+                      <span className="font-mono">{m.label}</span>
+                      <span className="text-[9px] uppercase text-muted-foreground">{m.tag}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <TextField
-                label="Modelo de IA Customizado"
+                label="Modelo (ID exato)"
                 value={local.model}
                 onChange={(v) => setLocal({ ...local, model: v })}
-                placeholder="nousresearch/hermes-3-llama-3.1-8b"
-                hint="Ex.: nousresearch/hermes-3-llama-3.1-8b · cognitivecomputations/dolphin-mixtral-8x7b · llama-3.3-70b-versatile"
+                placeholder="deepseek/deepseek-r1:free"
+                hint="Modelos 'reasoning' pensam antes de responder (preenchem o bloco 🧠 Raciocínio)."
               />
-            </div>
+
           </section>
 
           <section className="rounded-xl border border-border bg-surface-1 p-5">
