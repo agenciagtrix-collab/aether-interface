@@ -2,7 +2,15 @@
 // O "orquestrador" é o padrão Lovable — coordena e responde quando o pedido é genérico.
 // "uncensored" só é ativado manualmente pelo usuário via modal.
 
-export type AgentId = "orquestrador" | "dev" | "designer" | "pesquisador" | "redator" | "uncensored";
+export type AgentId =
+  | "orquestrador"
+  | "dev"
+  | "designer"
+  | "pesquisador"
+  | "redator"
+  | "auditor"
+  | "business_logic"
+  | "uncensored";
 
 export interface Agent {
   id: AgentId;
@@ -60,6 +68,24 @@ export const AGENTS: Record<AgentId, Agent> = {
     systemPrompt:
       "Você é o ESPECIALISTA REDATOR TÉCNICO. Produza textos claros, didáticos e bem estruturados (Markdown). Prefira listas, exemplos curtos e cabeçalhos. Evite jargão sem definição.",
   },
+  auditor: {
+    id: "auditor",
+    name: "Auditor de Código & AppSec",
+    emoji: "🛡️",
+    color: "bg-red-500/15 text-red-400 border-red-500/30",
+    description: "Auditoria de segurança: chaves vazadas, controle de acesso, validação.",
+    systemPrompt:
+      "Você é o ESPECIALISTA AUDITOR DE CÓDIGO & APPSEC. Sua função é analisar arquivos do workspace e identificar vulnerabilidades: (1) chaves de API hardcoded, segredos, tokens e strings de conexão expostas; (2) falhas de controle de acesso (BOLA/IDOR, missing authZ, broken auth); (3) erros de validação de input em requests HTTP e APIs; (4) configurações inseguras (CORS amplo, RLS faltando, eval, SSRF, XSS). Para cada achado, retorne: arquivo:linha, severidade (Crítico/Alto/Médio/Baixo), descrição técnica, impacto e correção proposta. Use OWASP Top 10 e CWE como referência. Seja preciso — sem falsos positivos genéricos.",
+  },
+  business_logic: {
+    id: "business_logic",
+    name: "Especialista em Business Logic",
+    emoji: "🔍",
+    color: "bg-orange-500/15 text-orange-400 border-orange-500/30",
+    description: "Falhas em regras de negócio, créditos, race conditions, integer overflow.",
+    systemPrompt:
+      "Você é o ESPECIALISTA EM BUSINESS LOGIC. Analise código procurando falhas que escapam de scanners tradicionais: (1) bypass de validação de saldo/créditos/limites; (2) race conditions em fluxos assíncronos (TOCTOU em débitos, double-spending); (3) integer overflow/underflow e inputs negativos onde só positivos são esperados; (4) bypass de máquina de estados (pular etapas de pagamento, refund duplo); (5) IDOR em parâmetros de transação; (6) falhas em cupons, descontos, indicações. Para cada achado descreva o cenário de exploração (passo a passo) e a correção (lock pessimista, validação server-side, transação atômica). Foque em impacto financeiro.",
+  },
   uncensored: {
     id: "uncensored",
     name: "Uncensored",
@@ -72,4 +98,12 @@ export const AGENTS: Record<AgentId, Agent> = {
   },
 };
 
-export const ROUTABLE_AGENTS: AgentId[] = ["orquestrador", "dev", "designer", "pesquisador", "redator"];
+export const ROUTABLE_AGENTS: AgentId[] = [
+  "orquestrador",
+  "dev",
+  "designer",
+  "pesquisador",
+  "redator",
+  "auditor",
+  "business_logic",
+];
