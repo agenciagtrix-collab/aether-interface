@@ -103,12 +103,15 @@ async function readZip(file: File, onProgress?: ProgressFn): Promise<AttachedFil
   };
 }
 
-export async function readAttachment(file: File): Promise<AttachedFile> {
+export async function readAttachment(file: File, onProgress?: ProgressFn): Promise<AttachedFile> {
   try {
-    if (isZipFile(file)) return readZip(file);
+    onProgress?.({ phase: "Iniciando", loaded: 0, total: 1 });
+    if (isZipFile(file)) return await readZip(file, onProgress);
 
     if (isReadableTextFile(file.name, file.type)) {
+      onProgress?.({ phase: "Lendo texto", loaded: 0, total: 1 });
       const text = await file.text();
+      onProgress?.({ phase: "Concluído", loaded: 1, total: 1 });
       return {
         id: crypto.randomUUID(),
         name: file.name,
@@ -121,7 +124,10 @@ export async function readAttachment(file: File): Promise<AttachedFile> {
     }
 
     if (file.type.startsWith("image/")) {
+      onProgress?.({ phase: "Lendo imagem", loaded: 0, total: 1 });
       const canInline = file.size <= MAX_IMAGE_BYTES;
+      const dataUrl = canInline ? await readAsDataUrl(file) : undefined;
+      onProgress?.({ phase: "Concluído", loaded: 1, total: 1 });
       return {
         id: crypto.randomUUID(),
         name: file.name,
@@ -131,10 +137,11 @@ export async function readAttachment(file: File): Promise<AttachedFile> {
         summary: canInline
           ? `Imagem lida (${formatBytes(file.size)}). Será enviada para modelos compatíveis com visão.`
           : `Imagem anexada (${formatBytes(file.size)}), mas excede ${formatBytes(MAX_IMAGE_BYTES)} e será enviada apenas como metadados.`,
-        dataUrl: canInline ? await readAsDataUrl(file) : undefined,
+        dataUrl,
       };
     }
 
+    onProgress?.({ phase: "Concluído", loaded: 1, total: 1 });
     return {
       id: crypto.randomUUID(),
       name: file.name,
@@ -154,6 +161,10 @@ export async function readAttachment(file: File): Promise<AttachedFile> {
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+export function formatFileSize(size: number): string {
+  return formatBytes(size);
 }
 
 export function buildAttachmentContext(files: AttachedFile[]): string {
