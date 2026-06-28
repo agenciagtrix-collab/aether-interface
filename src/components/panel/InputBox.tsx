@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Globe, Paperclip, SendHorizonal, X, FileText, FileArchive, Image as ImageIcon, FileQuestion, AlertCircle } from "lucide-react";
 import { usePanel } from "./PanelContext";
 import { cn } from "@/lib/utils";
@@ -42,7 +42,24 @@ export function InputBox({ onSubmit }: Props) {
     removeAttachedFile,
     clearAttachedFiles,
     isRunning,
+    pendingPrompt,
+    setPendingPrompt,
   } = usePanel();
+
+  // Aceita prompts injetados por painéis externos (Templates de Auditoria, etc.)
+  useEffect(() => {
+    if (!pendingPrompt) return;
+    setValue(pendingPrompt);
+    setPendingPrompt(null);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 200) + "px";
+      el.setSelectionRange(el.value.length, el.value.length);
+    });
+  }, [pendingPrompt, setPendingPrompt]);
 
   const isReadingFiles = reading.length > 0;
 

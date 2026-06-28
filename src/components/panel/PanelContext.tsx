@@ -64,6 +64,10 @@ interface PanelState {
 
   statusText: string;
   setStatusText: (s: string) => void;
+
+  /** Texto a ser pré-preenchido no InputBox (Templates de auditoria, etc.). */
+  pendingPrompt: string | null;
+  setPendingPrompt: (s: string | null) => void;
 }
 
 const Ctx = createContext<PanelState | null>(null);
@@ -77,6 +81,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   const [terminalSteps, setTerminalSteps] = useState<TerminalStep[]>([]);
   const [isRunning, setRunning] = useState(false);
   const [statusText, setStatusText] = useState("");
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
   const value = useMemo<PanelState>(
     () => ({
@@ -110,8 +115,10 @@ export function PanelProvider({ children }: { children: ReactNode }) {
       setRunning,
       statusText,
       setStatusText,
+      pendingPrompt,
+      setPendingPrompt,
     }),
-    [activeTab, mode, webSearchEnabled, attachedFiles, messages, terminalSteps, isRunning, statusText],
+    [activeTab, mode, webSearchEnabled, attachedFiles, messages, terminalSteps, isRunning, statusText, pendingPrompt],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

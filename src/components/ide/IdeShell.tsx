@@ -20,6 +20,7 @@ import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "reac
 import { FileExplorer } from "./FileExplorer";
 import { EditorArea } from "./EditorArea";
 import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
+import { AuditTemplatesPanel } from "./AuditTemplatesPanel";
 import { ChatView } from "@/components/panel/ChatView";
 import { ThinkingTerminal } from "@/components/panel/ThinkingTerminal";
 import { AgentsManager } from "@/components/panel/views/AgentsManager";
@@ -380,6 +381,7 @@ export function IdeShell({ topBar, children }: { topBar?: React.ReactNode; child
       {children}
       {topBar}
       <IdeShellInner />
+      <AuditTemplatesPanel />
     </WorkspaceProvider>
   );
 }
