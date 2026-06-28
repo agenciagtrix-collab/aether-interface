@@ -2,6 +2,8 @@ import { useState } from "react";
 import {
   Bot,
   Files,
+  GripHorizontal,
+  GripVertical,
   History,
   MessageSquare,
   Database,
@@ -22,6 +24,32 @@ import { cn } from "@/lib/utils";
 
 type ActivityView = "explorer" | "chat" | "agents" | "history" | "memory" | "settings";
 
+function ResizeHandle({ orientation }: { orientation: "horizontal" | "vertical" }) {
+  const isHorizontal = orientation === "horizontal";
+  const Icon = isHorizontal ? GripVertical : GripHorizontal;
+
+  return (
+    <PanelResizeHandle
+      aria-label={isHorizontal ? "Redimensionar colunas" : "Redimensionar linhas"}
+      className={cn(
+        "group relative z-20 flex shrink-0 items-center justify-center bg-background/40 outline-none transition-colors",
+        "hover:bg-primary/15 focus-visible:bg-primary/20 data-[separator=active]:bg-primary/20",
+        isHorizontal ? "w-2 cursor-col-resize" : "h-2 cursor-row-resize",
+      )}
+    >
+      <span
+        className={cn(
+          "flex items-center justify-center rounded-sm border border-border bg-surface-2 text-muted-foreground shadow-sm transition-colors",
+          "group-hover:border-primary/60 group-hover:text-primary group-data-[separator=active]:border-primary/70 group-data-[separator=active]:text-primary",
+          isHorizontal ? "h-10 w-1.5" : "h-1.5 w-10",
+        )}
+      >
+        <Icon className={cn(isHorizontal ? "h-3 w-3 rotate-90" : "h-3 w-3")} />
+      </span>
+    </PanelResizeHandle>
+  );
+}
+
 const ACTIVITY_ITEMS: { id: ActivityView; label: string; icon: typeof Files }[] = [
   { id: "explorer", label: "Explorador", icon: Files },
   { id: "chat", label: "Chat", icon: MessageSquare },
@@ -39,7 +67,7 @@ function ActivityBar({
   onSelect: (v: ActivityView) => void;
 }) {
   return (
-    <div className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-border bg-surface-1 py-2">
+    <nav className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-border bg-surface-1 py-2">
       {ACTIVITY_ITEMS.map(({ id, label, icon: Icon }) => {
         const isActive = active === id;
         return (
@@ -59,7 +87,7 @@ function ActivityBar({
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }
 
@@ -101,31 +129,60 @@ function IdeShellInner() {
   const showTerminal = mode === "agent";
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
+    <main className="fixed inset-0 flex h-[100dvh] w-screen flex-col overflow-hidden bg-background text-foreground">
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <ActivityBar active={view} onSelect={setView} />
 
-        <PanelGroup orientation="horizontal" className="flex h-full min-w-0 flex-1">
+        <PanelGroup
+          id="ide-root-layout"
+          orientation="horizontal"
+          resizeTargetMinimumSize={{ coarse: 28, fine: 10 }}
+          className="h-full min-h-0 min-w-0 flex-1"
+        >
           {/* Sidebar */}
-          <Panel defaultSize={18} minSize={10} maxSize={40} className="bg-surface-1">
+          <Panel
+            id="ide-sidebar"
+            defaultSize="18%"
+            minSize="220px"
+            maxSize="420px"
+            className="bg-surface-1"
+            style={{ overflow: "hidden" }}
+          >
             <div className="flex h-full w-full min-w-0 overflow-hidden">
               <SidebarPanel view={view} />
             </div>
           </Panel>
-          <PanelResizeHandle className="w-px bg-border transition-colors hover:bg-primary/50" />
+          <ResizeHandle orientation="horizontal" />
 
           {/* Editor + bottom terminal */}
-          <Panel defaultSize={52} minSize={20}>
-            <PanelGroup orientation="vertical" className="h-full w-full">
-              <Panel defaultSize={showTerminal ? 70 : 100} minSize={20}>
+          <Panel id="ide-editor-stack" defaultSize="52%" minSize="360px" style={{ overflow: "hidden" }}>
+            <PanelGroup
+              id="ide-editor-layout"
+              orientation="vertical"
+              resizeTargetMinimumSize={{ coarse: 28, fine: 10 }}
+              className="h-full min-h-0 w-full min-w-0"
+            >
+              <Panel
+                id="ide-editor"
+                defaultSize={showTerminal ? "70%" : "100%"}
+                minSize="220px"
+                style={{ overflow: "hidden" }}
+              >
                 <div className="h-full w-full min-w-0 overflow-hidden">
                   <EditorArea />
                 </div>
               </Panel>
               {showTerminal && (
                 <>
-                  <PanelResizeHandle className="h-px bg-border transition-colors hover:bg-primary/50" />
-                  <Panel defaultSize={30} minSize={10} className="bg-surface-1">
+                  <ResizeHandle orientation="vertical" />
+                  <Panel
+                    id="ide-thinking-terminal"
+                    defaultSize="30%"
+                    minSize="160px"
+                    maxSize="55%"
+                    className="bg-surface-1"
+                    style={{ overflow: "hidden" }}
+                  >
                     <div className="h-full w-full min-w-0 overflow-hidden">
                       <ThinkingTerminal />
                     </div>
@@ -134,10 +191,17 @@ function IdeShellInner() {
               )}
             </PanelGroup>
           </Panel>
-          <PanelResizeHandle className="w-px bg-border transition-colors hover:bg-primary/50" />
+          <ResizeHandle orientation="horizontal" />
 
           {/* Chat panel */}
-          <Panel defaultSize={30} minSize={18} maxSize={50} className="bg-surface-1">
+          <Panel
+            id="ide-chat"
+            defaultSize="30%"
+            minSize="340px"
+            maxSize="560px"
+            className="bg-surface-1"
+            style={{ overflow: "hidden" }}
+          >
             <div className="flex h-full w-full min-w-0 overflow-hidden">
               <ChatView />
             </div>
@@ -145,7 +209,7 @@ function IdeShellInner() {
         </PanelGroup>
       </div>
       <StatusBar />
-    </div>
+    </main>
   );
 }
 
