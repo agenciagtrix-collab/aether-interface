@@ -23,6 +23,7 @@ import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
 import { AuditTemplatesPanel } from "./AuditTemplatesPanel";
 import { ChatView } from "@/components/panel/ChatView";
 import { ThinkingTerminal } from "@/components/panel/ThinkingTerminal";
+import { RealTerminalPanel } from "./RealTerminalPanel";
 import { AgentsManager } from "@/components/panel/views/AgentsManager";
 import { TaskHistory } from "@/components/panel/views/TaskHistory";
 import { MemoryBank } from "@/components/panel/views/MemoryBank";
