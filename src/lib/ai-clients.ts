@@ -78,7 +78,7 @@ export async function callChatCompletion(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`${provider} ${res.status}: ${text || res.statusText}`);
+    throw new Error(friendlyError(provider, res.status, text, res.statusText, model));
   }
   const data = await res.json();
   const content = data?.choices?.[0]?.message?.content;
