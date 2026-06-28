@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, EyeOff, Save, RotateCcw, KeyRound, RefreshCw, Search, Check } from "lucide-react";
+import { Eye, EyeOff, Save, RotateCcw, KeyRound, RefreshCw, Search, Check, Flame, AlertTriangle, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { useSettings, type AIProvider } from "@/hooks/use-settings";
 import { cn } from "@/lib/utils";
@@ -7,8 +7,34 @@ import { cn } from "@/lib/utils";
 interface ModelOption {
   id: string;
   label: string;
-  hint?: string;
+  contextK?: number;
+  isFree?: boolean;
+  isUncensored?: boolean;
+  provider?: string;
 }
+
+const CACHE_KEY = "jarvis_models_cache_v1";
+const CACHE_TTL_MS = 1000 * 60 * 60 * 6; // 6h
+
+// Heurística: famílias/keywords conhecidas como uncensored/abliterated/roleplay-friendly
+const UNCENSORED_PATTERNS = [
+  "dolphin", "venice", "abliterat", "uncensored", "hermes", "nous", "wizardlm", "wizard-lm",
+  "mythomax", "noromaid", "airoboros", "lumimaid", "magnum", "rocinante", "stheno",
+  "openhermes", "spicy", "neuralhermes", "midnight", "fimbulvetr",
+];
+
+// Modelos free populares em famílias problemáticas (heurística simples)
+const RATE_LIMITED_HINTS = ["venice", "openrouter/auto"];
+
+function classifyModel(id: string, label: string): { isUncensored: boolean; mayRateLimit: boolean } {
+  const lower = (id + " " + label).toLowerCase();
+  return {
+    isUncensored: UNCENSORED_PATTERNS.some((p) => lower.includes(p)),
+    mayRateLimit: lower.includes(":free") && RATE_LIMITED_HINTS.some((p) => lower.includes(p)),
+  };
+}
+
+
 
 async function fetchModels(provider: AIProvider, apiKey: string): Promise<ModelOption[]> {
   if (provider === "openrouter") {
