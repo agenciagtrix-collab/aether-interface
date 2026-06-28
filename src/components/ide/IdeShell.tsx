@@ -23,6 +23,7 @@ import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
 import { AuditTemplatesPanel } from "./AuditTemplatesPanel";
 import { ChatView } from "@/components/panel/ChatView";
 import { ThinkingTerminal } from "@/components/panel/ThinkingTerminal";
+import { RealTerminalPanel } from "./RealTerminalPanel";
 import { AgentsManager } from "@/components/panel/views/AgentsManager";
 import { TaskHistory } from "@/components/panel/views/TaskHistory";
 import { MemoryBank } from "@/components/panel/views/MemoryBank";
@@ -35,6 +36,37 @@ import { cn } from "@/lib/utils";
 import { loadIdeUiState, saveIdeUiState, resetIdeLayout, type IdeUiState } from "@/lib/workspace/layout-storage";
 
 type ActivityView = "explorer" | "chat" | "agents" | "history" | "memory" | "settings";
+
+function BottomTerminalTabs() {
+  const [tab, setTab] = useState<"thinking" | "real">("thinking");
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex shrink-0 items-center gap-1 border-b border-border bg-surface-1 px-2 py-1">
+        {([
+          { id: "thinking", label: "Pensamento" },
+          { id: "real", label: "Terminal Real" },
+        ] as const).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={cn(
+              "rounded px-2 py-1 text-[11px] font-medium transition-colors",
+              tab === t.id
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground hover:bg-surface-2 hover:text-foreground",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {tab === "thinking" ? <ThinkingTerminal /> : <RealTerminalPanel />}
+      </div>
+    </div>
+  );
+}
+
 
 function ResizeHandle({ orientation }: { orientation: "horizontal" | "vertical" }) {
   const isHorizontal = orientation === "horizontal";
@@ -214,8 +246,9 @@ function MobileShell({
             <SheetTitle className="text-xs">Pensamento do Agente</SheetTitle>
           </SheetHeader>
           <div className="h-[calc(60vh-3rem)] overflow-hidden">
-            <ThinkingTerminal />
+            <BottomTerminalTabs />
           </div>
+
         </SheetContent>
       </Sheet>
     </Tabs>
@@ -343,8 +376,9 @@ function IdeShellInner() {
                     style={{ overflow: "hidden" }}
                   >
                     <div className="h-full w-full min-w-0 overflow-hidden">
-                      <ThinkingTerminal />
+                      <BottomTerminalTabs />
                     </div>
+
                   </Panel>
                 </>
               )}
