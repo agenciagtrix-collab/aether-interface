@@ -79,15 +79,21 @@ export function CodeBlock({
     if (result) setApplied(true);
   };
 
-  // Auto-apply opcional (modo Agente + confirmação)
+  // Auto-apply opcional — funciona em chat e agente
   useEffect(() => {
     if (autoTriedRef.current || applied || !meta.path || !adapter || !supportsWrite) return;
-    if (mode !== "agent") return;
-    const enabled = typeof window !== "undefined" && localStorage.getItem("jarvis_auto_apply") === "1";
-    if (!enabled) return;
+    if (typeof window === "undefined") return;
+    const mode =
+      localStorage.getItem("jarvis_auto_apply_mode") ??
+      (localStorage.getItem("jarvis_auto_apply") === "1" ? "ask" : "off");
+    if (mode === "off") return;
     autoTriedRef.current = true;
-    const ok = window.confirm(`Aplicar automaticamente edição em "${meta.path}"?`);
-    if (ok) void doApply();
+    if (mode === "always") {
+      void doApply();
+    } else {
+      const ok = window.confirm(`Aplicar edição em "${meta.path}"?`);
+      if (ok) void doApply();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, meta.path, adapter, supportsWrite, applied]);
 
