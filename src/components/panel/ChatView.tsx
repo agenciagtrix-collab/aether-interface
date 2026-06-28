@@ -1,9 +1,11 @@
+import { useCallback, useState } from "react";
 import { ModeSwitcher } from "./ModeSwitcher";
 import { MessageList } from "./MessageList";
 import { InputBox } from "./InputBox";
 import { usePanel, type TerminalStep } from "./PanelContext";
 import type { AttachedFile } from "./PanelContext";
 import { buildAttachmentContext } from "@/lib/file-readers";
+import { CodeContextBar } from "@/components/ide/CodeContextBar";
 import {
   callChatCompletion,
   streamChatCompletion,
@@ -45,6 +47,8 @@ function buildUserContent(text: string, attachments: AttachedFile[]): ChatMessag
 
 export function ChatView() {
   const panel = usePanel();
+  const [codeCtx, setCodeCtx] = useState("");
+  const handleCodeCtx = useCallback((s: string) => setCodeCtx(s), []);
 
   const buildHistory = (extra: ChatMessage[] = []): ChatMessage[] => {
     const history: ChatMessage[] = panel.messages
@@ -68,10 +72,11 @@ export function ChatView() {
   };
 
   const REASONING_SYSTEM =
-    "Você é um assistente cuidadoso. Antes de responder, pense passo a passo dentro de um bloco <think>...</think> " +
-    "explicando seu raciocínio. Em seguida, FORA do bloco, escreva a resposta final ao usuário em português, " +
-    "clara e bem formatada. Sempre inclua o bloco <think> antes da resposta. " +
-    "Quando precisar mostrar código, use Markdown com fences triplas, por exemplo ```tsx.";
+    "Você é um pair-programmer dentro de uma IDE (estilo VSCode) com acesso ao código do usuário. " +
+    "Antes de responder, pense passo a passo dentro de um bloco <think>...</think> explicando seu raciocínio. " +
+    "Depois, FORA do bloco, escreva a resposta final clara e em português. " +
+    "Quando mostrar código, use Markdown com fences triplas indicando linguagem e, quando estiver alterando um arquivo do projeto, " +
+    "use o formato ```lang:caminho/do/arquivo.tsx para o usuário poder aplicar a mudança.";
 
   const runChat = async (text: string, attachments: AttachedFile[]) => {
     panel.setStatusText("Pensando");
