@@ -93,6 +93,9 @@ function friendlyError(provider: string, status: number, body: string, statusTex
   }
   if (status === 401) return `🔑 Chave inválida (401). Cheque sua chave em Configurações.`;
   if (status === 402) return `💳 Créditos insuficientes (402). Adicione crédito no provedor ou troque para um modelo :free.`;
+  if (status === 400 && /image|vision|multimodal|content/i.test(body)) {
+    return `🖼️ O modelo "${model}" não aceitou imagem/anexo multimodal (400). Se você enviou print/foto, selecione um modelo com visão em Configurações (ex: modelos Gemini, GPT-4o/4.1 vision ou Llama multimodal) ou envie um arquivo de texto/ZIP.`;
+  }
   if (status === 404) return `❓ Modelo "${model}" não encontrado (404). Selecione outro em Configurações.`;
   return `${provider} ${status}: ${body || statusText}`;
 }
